@@ -13,7 +13,7 @@
 
 | الملف | الحجم | SHA-256 | ملاحظات |
 |---|---:|---|---|
-| `build/OpenBR.apk` | 27,756,125 | `9421385A467BD138160EDA870B8B20D891359828C6E4521D9D85EB0217CAD3C6` | debug، `CN=Android Debug`، minSdk 21 |
+| `build/OpenBR.apk` | 27,830,269 | `3DF3A0A91ED034C058F2A146A2E0DFBB09D1FFA25FBBFC62CA76CC152AAD58AF` | debug، `CN=Android Debug`، minSdk 21 |
 | `build/OpenBR-release.apk` | 26,228,360 | `AD8C80E7AFE3530353974F9AEEF18FA84E2336A706EAB2782DE9BBB6EB447776` | release، `CN=OpenBR`، APK v1/v2/v3، minSdk 21 |
 | `build/OpenBR-release.aab` | 26,162,670 | `8AFF36496750836833A976ACFE92C90DA2E27D9D299C9FE6463A8AF3F23D031B` | release، `CN=OpenBR`، `bundletool validate` exit 0، minSdk 21 |
 
