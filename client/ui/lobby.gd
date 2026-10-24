@@ -165,6 +165,7 @@ func _build_header() -> Control:
 	header.add_child(spacer)
 
 	var profile := _small("LOCAL PROFILE  ·  %d OPERATORS" % Characters.count())
+	profile.autowrap_mode = TextServer.AUTOWRAP_OFF
 	profile.add_theme_color_override("font_color", Color(0.55, 0.82, 0.78))
 	header.add_child(profile)
 	return header
