@@ -3,11 +3,11 @@ extends Node
 ## Networking facade shared by client and server.
 ## Every RPC lives here, so both sides agree on node paths (/root/Net).
 ##
-## Client -> server : authenticate(token, appearance), send_input, request_fire,
-##                    request_loot, request_use_item
-## Server -> client : spawn_player, apply_snapshot, apply_shot,
+## Client -> server : authenticate(token, appearance), request_ready, send_input,
+##                    request_fire, request_loot, request_use_item
+## Server -> client : match_state, spawn_player, apply_snapshot, apply_shot,
 ##                    apply_death, apply_respawn, player_gone, kicked,
-##                    loot_state, loot_taken, loot_result
+##                    loot_state, loot_taken, loot_result, kill_feed
 
 signal connected
 signal connection_failed
@@ -15,6 +15,7 @@ signal disconnected
 signal rejected(reason: String)
 
 signal auth_requested(id: int, token: String, appearance: Dictionary)
+signal ready_requested(id: int, ready: bool)
 signal input_received(id: int, dir: Vector2, yaw: float, jump: bool)
 signal fire_requested(id: int, dir: Vector3)
 signal weapon_requested(id: int, index: int)
@@ -23,6 +24,7 @@ signal loot_requested(id: int, loot_id: int)
 signal use_item_requested(id: int, item_type: String)
 signal peer_disconnected(id: int)
 
+signal match_state_received(state: Dictionary)
 signal player_spawned(id: int, pos: Vector3)
 signal snapshot_received(snap: Dictionary, tick: int, storm: Dictionary)
 signal player_left(id: int)
@@ -32,6 +34,8 @@ signal player_respawned(pos: Vector3)
 signal loot_state(taken: Array)
 signal loot_taken(loot_id: int, by: int)
 signal loot_result_received(message: String)
+signal loot_reset
+signal kill_feed_received(text: String)
 
 const SEND_HZ := 30.0
 
@@ -123,6 +127,17 @@ func request_use_item(item_type: String) -> void:
 		return
 	rpc_id(1, "request_use_item_rpc", item_type)
 
+func send_ready(ready: bool) -> void:
+	if is_server() or not is_client_connected():
+		return
+	rpc_id(1, "request_ready_rpc", ready)
+
+## Leave the current server without waiting for a socket timeout. The client
+## treats this exactly like a server disconnect and returns to the lobby.
+func leave_game() -> void:
+	_shutdown()
+	disconnected.emit()
+
 func _physics_process(delta: float) -> void:
 	if is_server() or not is_client_connected():
 		return
@@ -176,7 +191,23 @@ func request_use_item_rpc(item_type: String) -> void:
 		return
 	use_item_requested.emit(multiplayer.get_remote_sender_id(), item_type)
 
+@rpc("any_peer", "reliable")
+func request_ready_rpc(ready: bool) -> void:
+	if not multiplayer.is_server():
+		return
+	ready_requested.emit(multiplayer.get_remote_sender_id(), ready)
+
 # ---------------------------------------------------------------- server -> client
+
+func send_match_state(id: int, state: Dictionary) -> void:
+	rpc_id(id, "apply_match_state", state)
+
+func broadcast_match_state(state: Dictionary) -> void:
+	rpc("apply_match_state", state)
+
+@rpc("authority", "reliable")
+func apply_match_state(state: Dictionary) -> void:
+	match_state_received.emit(state)
 
 func spawn_for(id: int, pos: Vector3) -> void:
 	rpc_id(id, "spawn_player", id, pos)
@@ -241,11 +272,27 @@ func send_loot_result(id: int, message: String) -> void:
 func apply_loot_result(message: String) -> void:
 	loot_result_received.emit(message)
 
-func reject(id: int) -> void:
-	rpc_id(id, "kicked", "authentication failed")
+func send_loot_reset(id: int) -> void:
+	rpc_id(id, "apply_loot_reset")
+
+@rpc("authority", "reliable")
+func apply_loot_reset() -> void:
+	loot_reset.emit()
+
+func announce_kill_feed(text: String) -> void:
+	rpc("apply_kill_feed", text)
+
+@rpc("authority", "reliable")
+func apply_kill_feed(text: String) -> void:
+	kill_feed_received.emit(text)
+
+func reject(id: int, reason := "authentication failed") -> void:
+	rpc_id(id, "kicked", reason)
 	await get_tree().create_timer(0.5).timeout
 	if multiplayer.has_multiplayer_peer() and multiplayer.multiplayer_peer is ENetMultiplayerPeer:
-		(multiplayer.multiplayer_peer as ENetMultiplayerPeer).disconnect_peer(id)
+		var peer := multiplayer.multiplayer_peer as ENetMultiplayerPeer
+		if peer.get_peer(id) != null:
+			peer.disconnect_peer(id)
 
 @rpc("authority", "reliable")
 func kicked(reason: String) -> void:

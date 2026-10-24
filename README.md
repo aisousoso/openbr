@@ -42,6 +42,24 @@ godot --headless --path . res://server/main.tscn -- --port=7777 --dev-auth
 godot --headless --path . res://server/main.tscn -- --port=7777 --dev-auth --bots=3
 ```
 
+الخادم يبدأ في طور **WAITING** ولا تبدأ الجولة حتى يضغط لاعب حقيقي **READY**
+(أو حتى يتحقق `--auto-start`). معاملات دورة المباراة:
+
+| المعامل | الافتراضي | الوظيفة |
+|---|---:|---|
+| `--min-players=N` | `2` | عدد اللاعبين (بشر + بوتات) المطلوب لبدء الجولة |
+| `--countdown=N` | `8` | ثواني العد التنازلي قبل `LIVE` |
+| `--end-delay=N` | `10` | ثواني عرض النتيجة قبل العودة إلى اللوبي |
+| `--auto-start` | معطّل | تجاهل READY (للاختبارات؛ يظل يحتاج لاعبًا حقيقيًا واحدًا) |
+| `--dev-respawn` | معطّل | إعادة respawn بعد 3s (وضع اختبار قديم فقط) |
+
+مثال جولة اختبار سريعة بدون انتظار:
+
+```bash
+godot --headless --path . res://server/main.tscn -- `
+  --port=7777 --dev-auth --bots=3 --auto-start --countdown=0 --min-players=2
+```
+
 > إذا لم يكن `godot` مضافًا إلى `PATH` على Windows، استخدم المسار الكامل لملف
 > `Godot_v4.4.1-stable_win64_console.exe` بدلًا من `godot`.
 
@@ -92,10 +110,35 @@ RELOAD، و**JUMP** أسفل اليسار من FIRE، وأزرار **LOOT / BAND
 godot --path . -- --touch
 ```
 
-### 4) قواعد القتال الحالية
+### 4) دورة المباراة (Match Lifecycle)
+
+الخادم يدير الحالات التالية، والعميل يعرضها فقط:
+
+```
+WAITING ──READY / auto-start──> COUNTDOWN ──> LIVE ──> ENDED ──> WAITING
+```
+
+- **WAITING:** اللوبي. الحركة والقتال والـloot والـstorm متوقفة. زر **READY**
+  في لوحة المباراة، وعدد الجاهزين/اللاعبين ظاهر. البوتات جاهزة تلقائيًا، لكن
+  يجب أن يكون لاعب بشري واحد على الأقل جاهزًا.
+- **COUNTDOWN:** تجميد كامل وعد تنازلي. أي نقص في عدد اللاعبين يلغي العد
+  ويعيد الخادم إلى `WAITING`.
+- **LIVE:** جولة واحدة، **حياة واحدة**. لا respawn. العاصفة تبدأ فقط الآن.
+  آخر لاعب/بوت حي يفوز، ويُسجَّل ترتيب كل مُقصى (`placement`).
+- **ENDED:** إعلان `VICTORY` أو `ELIMINATED #N` مع اسم الفائز، ثم العودة
+  التلقائية إلى اللوبي بعد `--end-delay`.
+- **الانضمام المتأخر:** يُرفض أي مصادقة جديدة أثناء `COUNTDOWN` أو `LIVE`
+  أو `ENDED` برسالة `match in progress`.
+- **المُقصى:** يدخل **spectator mode** بكاميرا خلف لاعب حي، مع زر **NEXT**
+  لتبديل الهدف وزر **LEAVE** للخروج، ويبقى kill feed يعمل.
+- **إعادة المباراة:** بعد `ENDED` يعيد الخادم الجميع إلى اللوبي ويصفّر
+  HP/armor/inventory/ammo/kills/loot/storm، ثم ينتظر READY من جديد.
+
+### 5) قواعد القتال الحالية
 
 - اللاعب يبدأ بـ**100 HP**؛ كل سلاح له ضرر ومعدل إطلاق ومدى وذخيرة مستقلة.
-- بعد الإقصاء: 3 ثوانٍ ثم respawn داخل المنطقة الآمنة الحالية.
+- في `LIVE` لا يوجد respawn؛ الموت = إقصاء نهائي. `--dev-respawn` يعيد سلوك
+  3 ثوانٍ القديم للاختبار فقط.
 - HUD يعرض اسم الخريطة، HP، عدد الإقصاءات، حالة العاصفة، والسلاح الحالي مع
   `mag / reserve` و`RELOADING...` أثناء إعادة التلقيم.
 - أثر الرصاصة (tracer) يظهر لكل اللاعبين بلون مختلف لكل سلاح.
@@ -148,8 +191,8 @@ godot --path . -- --touch
   والعنصر يبقى مستهلكًا. الـHUD يعرض `USING BANDAGE/MEDKIT  x.xs`.
 - **Inventory:** العدّادات موجودة في snapshot والـHUD (`BANDAGE xN   MEDKIT xN`).
   الالتقاط يفشل إذا كان العنصر ممتلئًا أو الدرع ممتلئًا، ويظهر سبب الرفض في رسالة
-  قصيرة. الـrespawn يعيد الدرع والـconsumables إلى الصفر ويجدد الذخيرة، لكن
-  العناصر المأخوذة تبقى مأخوذة في المباراة.
+  قصيرة. بداية كل جولة (وبعد `ENDED`) تعيد الدرع والـconsumables والذخيرة إلى
+  الصفر، وتعيد كل عناصر الـloot إلى الخريطة.
 - **الأمان:** العميل لا يرسل HP أو armor أو عدد العناصر أو الضرر. كل هذه القيم
   تُحسب وتُخزَّن على الخادم، والـsnapshot يحمل الحقول الإضافية:
   `armor, bandage, medkit, heal_remaining, heal_type` بعد حقول المظهر.
@@ -159,11 +202,12 @@ godot --path . -- --touch
 ```powershell
 # terminal 1
 godot --headless --path . res://server/main.tscn -- `
-  --port=7777 --dev-auth --bots=0 --test-loot --run-seconds=12
+  --port=7777 --dev-auth --bots=0 --test-loot --auto-start `
+  --countdown=0 --min-players=1 --run-seconds=12
 
 # terminal 2
 godot --headless --path . -- `
-  --host=127.0.0.1 --port=7777 --token=dev --test-loot --run-seconds=7
+  --host=127.0.0.1 --port=7777 --token=dev --test-loot --run-seconds=9
 ```
 
 `--test-loot` على الخادم يخفض HP البداية إلى 60 فقط لاختبار العلاج، وعلى العميل
@@ -240,8 +284,8 @@ Server: origin  = player_pos + (0, 1.65, 0)   # العميل لا يرسل مو�
         weapon  = shared/weapons.gd[current]
         wall    = raycast(origin, pellet_dir, weapon.range, mask=1)
         hit     = nearest player sphere (r=0.6, center=pos+0.9)
-        damage  = weapon.damage لكل pellet → death → respawn بعد 3s
-Server ──send_shot(..., weapon) / apply_death / apply_respawn──> Clients
+        damage  = weapon.damage لكل pellet → death → placement + ENDED
+Server ──send_shot(..., weapon) / apply_death / match_state / kill_feed──> Clients
 ```
 
 - معدل الإطلاق والمدى والضرر وعدد pellets تُقرأ من `shared/weapons.gd` على الخادم.
@@ -267,16 +311,19 @@ Server ──send_shot(..., weapon) / apply_death / apply_respawn──> Clients
 - المركز الحالي: `(0, 0)`، ونصف القطر الابتدائي `54m` (الخريطة 120×120).
 - أثناء أول 25 ثانية لا يوجد ضرر؛ بعدها يُطبَّق الضرر كل ثانية تقريبًا.
 - الموت بسبب العاصفة يستخدم `killer_id = 0`، ولا يزيد قتلات أي لاعب.
-- الـrespawn يختار نقطة داخل الدائرة الحالية، أو نقطة قريبة من المركز إذا
-  لم تعد أي نقطة spawn داخل الدائرة.
+- العاصفة **لا تتحرك ولا تؤذي** إلا في طور `LIVE`؛ في `WAITING`/`COUNTDOWN`
+  يرسل الخادم حالة فارغة ويخفي العميل الجدار.
+- في `--dev-respawn` فقط يختار الـrespawn نقطة داخل الدائرة الحالية؛ في الجولة
+  العادية لا يوجد respawn أصلًا.
 - العميل يرسم جدارًا أسطوانيًا شفافًا + حلقة أرضية (`client/storm.tscn`)،
   ويُظهر حالة العاصفة في أعلى اليسار، مع تحذير أحمر عند الخروج من الدائرة.
 
-للاختبار السريع محليًا (يُسرّع مؤقتات العاصفة 10× ويغلق الخادم بعد 12 ثانية):
+للاختبار السريع محليًا (يُسرّع مؤقتات العاصفة 10× ويغلق الخادم بعد 25 ثانية):
 
 ```powershell
 godot --headless --path . res://server/main.tscn -- `
-  --port=7777 --dev-auth --storm-fast --run-seconds=12
+  --port=7777 --dev-auth --storm-fast --dev-respawn --auto-start `
+  --countdown=0 --min-players=1 --run-seconds=25
 ```
 
 ---
@@ -299,9 +346,12 @@ godot --headless --path . res://server/main.tscn -- `
   (`999`) حتى لا تنتهي اختبارات طويلة ببوتات بلا ذخيرة.
 - العملاء يرون البوتات كـremote players، ويستقبلون tracers وأحداث القتل.
   عند قتلك بوتًا تظهر `Eliminated a bot`، وعند قتل بوت لك تظهر `a bot`.
-- البوتات تموت وتُعاد spawn مثل اللاعبين، وتستمر في القتال حتى إيقاف الخادم.
+- البوتات تُقصى مثل اللاعبين في الجولة العادية (لا respawn)، وتعود في اللوبي
+  بعد `ENDED`. مع `--dev-respawn` فقط تستمر في القتال بعد الموت.
+- البوتات تُحتسب في `--min-players` وتكون جاهزة تلقائيًا، لكنها لا تبدأ جولة
+  بدون لاعب بشري واحد على الأقل.
 
-اختبار آلي سريع للأسلحة من طرف العميل (dev-only):
+اختبار آلي سريع للأسلحة من طرف العميل (dev-only، يحتاج خادمًا في `LIVE`):
 
 ```bash
 godot --headless --path . -- `
@@ -443,11 +493,11 @@ adb install -r build/OpenBR-release.apk
 
 | الملف | الحجم | SHA-256 | التوقيع / ملاحظات |
 |---|---:|---|---|
-| `build/OpenBR.apk` | 27,231,037 | `00843682783F963C5E8D007D2FA685892B419C1C91406D42F96D462C8F80788A` | debug، `CN=Android Debug`، ARM64، minSdk 21 |
-| `build/OpenBR-release.apk` | 25,703,272 | `2FB4E6AD07CB2A39AA94631C4CE4DBA60F4E8D9353A2C9C259B741376035EB96` | release، `CN=OpenBR`، APK v1/v2/v3، minSdk 21 |
-| `build/OpenBR-release.aab` | 25,639,580 | `3330EAB3C497C8EEF7782B46954059DAF0D610A091F513E67F7C24639B18AE25` | release، `CN=OpenBR`، `bundletool validate` exit 0، minSdk 21 |
+| `build/OpenBR.apk` | 27,756,125 | `9421385A467BD138160EDA870B8B20D891359828C6E4521D9D85EB0217CAD3C6` | debug، `CN=Android Debug`، ARM64، minSdk 21 |
+| `build/OpenBR-release.apk` | 26,228,360 | `AD8C80E7AFE3530353974F9AEEF18FA84E2336A706EAB2782DE9BBB6EB447776` | release، `CN=OpenBR`، APK v1/v2/v3، minSdk 21 |
+| `build/OpenBR-release.aab` | 26,162,670 | `8AFF36496750836833A976ACFE92C90DA2E27D9D299C9FE6463A8AF3F23D031B` | release، `CN=OpenBR`، `bundletool validate` exit 0، minSdk 21 |
 
-كل المخرجات: `org.openbr.game`، الإصدار `0.1.0`، `targetSdk 34`، ARM64 فقط،
+كل المخرجات: `org.openbr.game`، الإصدار `0.2.0`، `targetSdk 34`، ARM64 فقط،
 وصلاحية `INTERNET`. الـAPK غير debuggable في نسخة release.
 
 > **minSdk موحّد:** APK وAAB كلاهما الآن على **minSdk 21** بعد ضبط
@@ -555,7 +605,7 @@ openbr/
 8. Client ──request_loot(id) / request_use_item(type)──> Server
 9. Server: movement + weapon state + hitscan + armor + healing + loot @30Hz
 10. Server ──apply_snapshot(snap + weapon/ammo + appearance + armor/inventory, storm) @20Hz──> كل عميل
-11. Server ──apply_shot / apply_death / apply_respawn / loot_state / loot_taken──> Clients
+11. Server ──apply_shot / apply_death / match_state / kill_feed / loot_state / loot_taken──> Clients
 ```
 
 - **الخادم سلطوي**: لا يثق بموقع العميل ولا بسرعة حركته ولا بجهة إصابته،
@@ -576,8 +626,12 @@ openbr/
 - [x] اختبار LAN محلي (خادم + عميل headless)
 - [x] حركة مشتركة وتصادم حقيقي على الخادم (`verdant_reach.tscn`)
 - [x] Snapshots + interpolation + reconciliation
-- [x] إطلاق نار hitscan + جدران تحجب + ضرر + موت + respawn
-- [x] HUD (HP / armor / kills / storm / weapon+ammo / inventory / heal / hit marker / damage flash) + tracers
+- [x] إطلاق نار hitscan + جدران تحجب + ضرر + موت + إقصاء
+- [x] دورة مباراة BR: WAITING → COUNTDOWN → LIVE → ENDED → RESET
+- [x] READY + auto-start + min-players + عد تنازلي قابل للضبط
+- [x] حياة واحدة + فوز آخر لاعب + placement + spectator + kill feed
+- [x] رفض الانضمام المتأخر أثناء COUNTDOWN/LIVE/ENDED
+- [x] HUD (HP / armor / kills / ALIVE / storm / weapon+ammo / inventory / heal / kill feed / hit marker / damage flash) + tracers
 - [x] Interest management بالخلايا (20m / 45m)
 - [x] Matchmaker Go + Dockerfile + Compose
 - [x] شاشة اتصال (Host/Port/Token) مع حفظ الإعدادات
@@ -588,7 +642,7 @@ openbr/
 - [x] بناء release AAB موقّع + `bundletool validate` (`build/OpenBR-release.aab`)
 - [ ] تشغيل GitHub Actions فعليًا بعد إضافة remote والدفع (الـworkflow جاهز)
 - [ ] اختبار اللمس واللعب LAN على هاتف Android حقيقي (بانتظار جهاز متصل)
-- [x] الدائرة المتقلصة (storm) — خادم سلطوي + رسم على العميل + HUD + respawn آمن
+- [x] الدائرة المتقلصة (storm) — خادم سلطوي + رسم على العميل + HUD، تعمل في LIVE فقط
 - [x] أسلحة متعددة (Rifle/SMG/Shotgun) + ذخيرة + إعادة تلقيم + تبديل
 - [x] بوتات اختبار server-only (`--bots=N`, حتى 16)
 - [x] لوبي أصلي + اختيار شخصية (12 شخصية) + تخصيص ألوان/ملابس + معاينة 3D

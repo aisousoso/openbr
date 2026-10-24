@@ -7,6 +7,9 @@ const Weapons := preload("res://shared/weapons.gd")
 
 var spawn_id := 0
 var is_alive := true
+## Set by main.gd from the authoritative match phase. Movement, look and all
+## gameplay requests are ignored while false (lobby, countdown, spectating).
+var input_enabled := true
 var touch_mode := false
 var weapon_index := 0
 var loot_field = null
@@ -32,6 +35,8 @@ func _process(delta: float) -> void:
 	_fire_cd = maxf(0.0, _fire_cd - delta)
 
 func _unhandled_input(event: InputEvent) -> void:
+	if not input_enabled:
+		return
 	# In touch mode the TouchControls node supplies look/fire instead.
 	if touch_mode or OS.has_feature("mobile"):
 		return
@@ -71,20 +76,22 @@ func _unhandled_input(event: InputEvent) -> void:
 ## Rotate the body/head by a raw pointer delta (pixels). Shared by mouse and
 ## touch drag handling.
 func apply_look(relative: Vector2) -> void:
+	if not input_enabled:
+		return
 	rotate_y(-relative.x * mouse_sensitivity)
 	head.rotate_x(-relative.y * mouse_sensitivity)
 	head.rotation.x = clampf(head.rotation.x, -1.4, 1.4)
 
 ## Fire request used by mouse click and the on-screen FIRE button.
 func request_fire() -> void:
-	if not is_alive or _fire_cd > 0.0:
+	if not input_enabled or not is_alive or _fire_cd > 0.0:
 		return
 	_fire_cd = float(Weapons.get_weapon(weapon_index)["cooldown"])
 	var dir := -camera.global_transform.basis.z
 	Net.try_fire(dir.normalized())
 
 func request_weapon(index: int) -> void:
-	if not is_alive:
+	if not input_enabled or not is_alive:
 		return
 	weapon_index = clampi(index, 0, Weapons.count() - 1)
 	Net.request_weapon(weapon_index)
@@ -93,22 +100,22 @@ func cycle_weapon() -> void:
 	request_weapon((weapon_index + 1) % Weapons.count())
 
 func request_reload() -> void:
-	if not is_alive:
+	if not input_enabled or not is_alive:
 		return
 	Net.request_reload()
 
 func request_loot() -> void:
-	if not is_alive or loot_field == null:
+	if not input_enabled or not is_alive or loot_field == null:
 		return
 	loot_field.request_nearest()
 
 func request_use_item(item_type: String) -> void:
-	if not is_alive:
+	if not input_enabled or not is_alive:
 		return
 	Net.request_use_item(item_type)
 
 func _physics_process(delta: float) -> void:
-	if not is_alive:
+	if not input_enabled or not is_alive:
 		return
 
 	var input_dir := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
@@ -126,4 +133,5 @@ func set_alive(value: bool) -> void:
 	if model != null:
 		model.visible = value
 	if not value:
+		input_enabled = false
 		velocity = Vector3.ZERO

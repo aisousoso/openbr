@@ -13,11 +13,11 @@
 
 | الملف | الحجم | SHA-256 | ملاحظات |
 |---|---:|---|---|
-| `build/OpenBR.apk` | 27,231,037 | `00843682783F963C5E8D007D2FA685892B419C1C91406D42F96D462C8F80788A` | debug، `CN=Android Debug`، minSdk 21 |
-| `build/OpenBR-release.apk` | 25,703,272 | `2FB4E6AD07CB2A39AA94631C4CE4DBA60F4E8D9353A2C9C259B741376035EB96` | release، `CN=OpenBR`، APK v1/v2/v3، minSdk 21 |
-| `build/OpenBR-release.aab` | 25,639,580 | `3330EAB3C497C8EEF7782B46954059DAF0D610A091F513E67F7C24639B18AE25` | release، `CN=OpenBR`، `bundletool validate` exit 0، minSdk 21 |
+| `build/OpenBR.apk` | 27,756,125 | `9421385A467BD138160EDA870B8B20D891359828C6E4521D9D85EB0217CAD3C6` | debug، `CN=Android Debug`، minSdk 21 |
+| `build/OpenBR-release.apk` | 26,228,360 | `AD8C80E7AFE3530353974F9AEEF18FA84E2336A706EAB2782DE9BBB6EB447776` | release، `CN=OpenBR`، APK v1/v2/v3، minSdk 21 |
+| `build/OpenBR-release.aab` | 26,162,670 | `8AFF36496750836833A976ACFE92C90DA2E27D9D299C9FE6463A8AF3F23D031B` | release، `CN=OpenBR`، `bundletool validate` exit 0، minSdk 21 |
 
-كل المخرجات: `org.openbr.game`، الإصدار `0.1.0`، `targetSdk 34`، ARM64 فقط،
+كل المخرجات: `org.openbr.game`، الإصدار `0.2.0`، `targetSdk 34`، ARM64 فقط،
 وصلاحية `INTERNET`. نسخة release غير debuggable.
 
 ---
@@ -307,8 +307,19 @@ Shotgun (12×6 pellets، 6/24). الذخيرة والضرر وإعادة الت�
 - **BANDAGE** (25 HP / 2s) و**MEDKIT** (60 HP / 4s) يظهر عددهما في الـHUD،
   واستخدامهما يستهلك العنصر فورًا. أي ضرر أو إطلاق نار يلغي العلاج.
 - الـHUD يعرض `BANDAGE xN   MEDKIT xN` و`USING ... x.xs`.
-- الـrespawn يعيد الدرع والـconsumables إلى الصفر، لكن العناصر المأخوذة تبقى
-  مأخوذة في المباراة. كل التحقق من المسافة والكمية والضرر يتم على الخادم.
+- بداية كل جولة (وبعد نهاية المباراة) تعيد الدرع والـconsumables والذخيرة إلى
+  الصفر، وتعيد كل عناصر الـloot إلى الخريطة. كل التحقق من المسافة والكمية
+  والضرر يتم على الخادم.
+
+### دورة المباراة على الهاتف
+
+- بعد الاتصال تظهر لوحة **BATTLE ROYALE** وزر **READY**؛ لا تبدأ الحركة أو
+  القتال قبل طور `LIVE`.
+- الجولة حياة واحدة: عند الإقصاء تظهر شاشة/شريط **SPECTATING** مع زر **NEXT**
+  لتبديل اللاعب المراقَب وزر **LEAVE** للخروج.
+- عند الفوز تظهر **VICTORY**، وعند الإقصاء **ELIMINATED #N**، ثم يعود الجميع
+  إلى اللوبي تلقائيًا بعد `--end-delay`.
+- kill feed و`ALIVE n / n` يظهران في الـHUD أثناء الجولة.
 
 ---
 

@@ -5,6 +5,8 @@ extends Node3D
 
 @export var interpolation_speed := 15.0
 
+var is_alive := true
+
 var _target_pos := Vector3.ZERO
 var _target_yaw := 0.0
 var _has_target := false
@@ -24,6 +26,7 @@ func apply_appearance(appearance: Dictionary) -> void:
 		model.apply_appearance(appearance)
 
 func set_alive(value: bool) -> void:
+	is_alive = value
 	if model != null:
 		model.visible = value
 

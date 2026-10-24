@@ -30,7 +30,14 @@ var _run_seconds := 0.0
 var _run_elapsed := 0.0
 var _combat_test_started := false
 var _loot_test_started := false
+var _ready_test_started := false
 var _appearance: Dictionary = {}
+
+var _match_state: Dictionary = {}
+var _last_phase := ""
+var _spectating := false
+var _spectate_target_id := 0
+var _spectator_camera: Camera3D
 
 @onready var hud = $HUD
 @onready var touch = $Touch
@@ -38,6 +45,7 @@ var _appearance: Dictionary = {}
 @onready var lobby = $Lobby
 @onready var storm_visual = $Storm
 @onready var loot_field = $LootField
+@onready var match_panel = $MatchPanel
 
 func _ready() -> void:
 	$World.add_child(ARENA.instantiate())
@@ -53,6 +61,8 @@ func _ready() -> void:
 	Net.player_died.connect(_on_player_died)
 	Net.player_respawned.connect(_on_player_respawned)
 	Net.loot_result_received.connect(_on_loot_result)
+	Net.match_state_received.connect(_on_match_state)
+	Net.kill_feed_received.connect(_on_kill_feed)
 
 	connect_screen.connect_requested.connect(_on_connect_requested)
 	connect_screen.back_requested.connect(_on_connect_back)
@@ -61,6 +71,15 @@ func _ready() -> void:
 	touch.loot.connect(_on_touch_loot)
 	touch.use_bandage.connect(_on_touch_use_bandage)
 	touch.use_medkit.connect(_on_touch_use_medkit)
+	match_panel.ready_pressed.connect(_on_ready_pressed)
+	match_panel.leave_pressed.connect(_on_leave_pressed)
+	match_panel.spectate_next_pressed.connect(_on_spectate_next)
+
+	_spectator_camera = Camera3D.new()
+	_spectator_camera.name = "SpectatorCamera"
+	_spectator_camera.fov = 72.0
+	_spectator_camera.current = false
+	add_child(_spectator_camera)
 
 	hud.set_map_name(MapData.NAME)
 	hud.visible = false
@@ -96,11 +115,16 @@ func _process(_delta: float) -> void:
 			remote_players[id].queue_free()
 			remote_players.erase(id)
 
+	if _spectating:
+		_update_spectator_camera()
+
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel"):
 		# Do not steal the mouse while the connection or lobby UI is open, and
 		# the touch UI needs a visible pointer on desktop (--touch).
 		if lobby.visible or connect_screen.visible or local_player == null or touch.is_enabled():
+			return
+		if String(_match_state.get("phase", "")) != "LIVE" or not local_player.input_enabled:
 			return
 		if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 			Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
@@ -146,7 +170,10 @@ func _on_rejected(reason: String) -> void:
 	_reject_reason = reason
 
 func _on_disconnected() -> void:
-	print("Disconnected from server.")
+	if _reject_reason.is_empty():
+		print("Disconnected from server.")
+	else:
+		print("Disconnected from server: %s" % _reject_reason)
 	if is_instance_valid(local_player):
 		local_player.queue_free()
 	local_player = null
@@ -155,9 +182,18 @@ func _on_disconnected() -> void:
 	remote_players.clear()
 	_seen.clear()
 
+	_spectating = false
+	_spectate_target_id = 0
+	if _spectator_camera != null:
+		_spectator_camera.current = false
+	_match_state = {}
+	match_panel.hide_panel()
+
 	touch.set_active(false)
 	touch.reset()
 	hud.visible = false
+	hud.clear_kill_feed()
+	hud.set_alive(0, 0)
 	loot_field.visible = false
 	storm_visual.reset()
 	loot_field.set_local_player(null)
@@ -205,6 +241,9 @@ func _on_player_spawned(id: int, pos: Vector3) -> void:
 
 	hud.visible = true
 	loot_field.visible = true
+	match_panel.hide_panel()
+	hud.set_alive(0, 0)
+	hud.clear_kill_feed()
 	var start_weapon := Weapons.get_weapon(0)
 	hud.set_weapon(0, int(start_weapon["mag"]), int(start_weapon["reserve"]), false)
 	hud.set_armor(0)
@@ -225,6 +264,23 @@ func _on_player_spawned(id: int, pos: Vector3) -> void:
 	if _has_arg("--test-loot") and not _loot_test_started:
 		_loot_test_started = true
 		_run_loot_test()
+	if _has_arg("--test-ready") and not _ready_test_started:
+		_ready_test_started = true
+		_run_ready_test()
+
+func _run_ready_test() -> void:
+	# Dev-only smoke test for the lobby READY -> COUNTDOWN -> LIVE path.
+	await get_tree().create_timer(1.0).timeout
+	if local_player == null:
+		return
+	print("ready test: phase=%s ready=%s" % [
+		String(_match_state.get("phase", "")), str(_match_state.get("you_ready", false)),
+	])
+	Net.send_ready(true)
+	await get_tree().create_timer(4.0).timeout
+	print("ready test after: phase=%s alive=%s" % [
+		String(_match_state.get("phase", "")), str(_match_state.get("you_alive", false)),
+	])
 
 func _run_loot_test() -> void:
 	# Dev-only smoke test: walk up to the spawn-adjacent loot in spirit (the
@@ -269,11 +325,137 @@ func _run_combat_test() -> void:
 	await get_tree().create_timer(0.5).timeout
 	print("combat test done: hud='%s' remotes=%d" % [hud.weapon_label.text, remote_players.size()])
 
+# ---------------------------------------------------------------- match state
+
+func _on_match_state(state: Dictionary) -> void:
+	_match_state = state
+	var phase := String(state.get("phase", "WAITING"))
+	var you_alive := bool(state.get("you_alive", false))
+
+	match_panel.apply_state(state)
+	hud.set_alive(int(state.get("alive", 0)), int(state.get("total", 0)))
+	# Loot is only interactive during a live match; keep the lobby readable.
+	var live := phase == "LIVE"
+	loot_field.visible = live
+	if not live:
+		hud.set_loot_prompt("", false)
+	if OS.is_debug_build() and phase != _last_phase:
+		_last_phase = phase
+		print("Match: %s (alive %d/%d, placement %d, winner '%s')" % [
+			phase,
+			int(state.get("alive", 0)),
+			int(state.get("total", 0)),
+			int(state.get("placement", 0)),
+			String(state.get("winner_name", "")),
+		])
+
+	if local_player != null:
+		if phase == "LIVE" and not you_alive:
+			_start_spectating()
+		elif _spectating:
+			_stop_spectating()
+
+		local_player.input_enabled = phase == "LIVE" and you_alive and not _spectating
+		if touch.is_enabled():
+			touch.set_active(phase == "LIVE" and you_alive and not _spectating)
+		elif phase == "LIVE" and you_alive:
+			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+		else:
+			Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+
+	if _spectating:
+		match_panel.set_spectator_target(_roster_name(_spectate_target_id))
+
+func _on_kill_feed(text: String) -> void:
+	hud.push_kill_feed(text)
+	if OS.is_debug_build():
+		print("Kill feed: %s" % text)
+
+func _on_ready_pressed(ready: bool) -> void:
+	Net.send_ready(ready)
+
+func _on_leave_pressed() -> void:
+	Net.leave_game()
+
+func _on_spectate_next() -> void:
+	_select_next_spectate_target()
+
+func _start_spectating() -> void:
+	if _spectating or local_player == null:
+		return
+	_spectating = true
+	local_player.input_enabled = false
+	if touch.is_enabled():
+		touch.set_active(false)
+	_spectate_target_id = 0
+	_select_next_spectate_target()
+	if _spectator_camera != null:
+		_spectator_camera.current = true
+		_update_spectator_camera()
+	if OS.is_debug_build():
+		print("Spectating: %s" % _roster_name(_spectate_target_id))
+
+func _stop_spectating() -> void:
+	if not _spectating:
+		return
+	_spectating = false
+	_spectate_target_id = 0
+	if _spectator_camera != null:
+		_spectator_camera.current = false
+	if local_player != null and is_instance_valid(local_player):
+		local_player.camera.current = true
+	if touch.is_enabled() and String(_match_state.get("phase", "")) == "LIVE":
+		touch.set_active(true)
+
+func _alive_remote_ids() -> Array:
+	var ids: Array = []
+	for id in remote_players:
+		var rp = remote_players[id]
+		if is_instance_valid(rp) and rp.is_alive:
+			ids.append(id)
+	ids.sort()
+	return ids
+
+func _select_next_spectate_target() -> void:
+	var ids := _alive_remote_ids()
+	if ids.is_empty():
+		_spectate_target_id = 0
+		match_panel.set_spectator_target("no survivors")
+		return
+	if _spectate_target_id in ids:
+		var index := ids.find(_spectate_target_id)
+		_spectate_target_id = int(ids[(index + 1) % ids.size()])
+	else:
+		_spectate_target_id = int(ids[0])
+	match_panel.set_spectator_target(_roster_name(_spectate_target_id))
+
+func _update_spectator_camera() -> void:
+	if _spectator_camera == null:
+		return
+	var target = remote_players.get(_spectate_target_id)
+	if target == null or not is_instance_valid(target) or not target.is_alive:
+		_select_next_spectate_target()
+		target = remote_players.get(_spectate_target_id)
+	if target == null or not is_instance_valid(target):
+		return
+	var focus: Vector3 = target.global_position + Vector3(0.0, 1.35, 0.0)
+	var back := Vector3(0.0, 3.4, 6.2).rotated(Vector3.UP, target.rotation.y)
+	_spectator_camera.global_position = focus + back
+	_spectator_camera.look_at(focus, Vector3.UP)
+
+func _roster_name(id: int) -> String:
+	for entry in _match_state.get("roster", []):
+		if int(entry.get("id", 0)) == id:
+			return String(entry.get("name", "PLAYER"))
+	return "PLAYER %d" % id
+
 func _on_snapshot(snap: Dictionary, _tick: int, storm: Dictionary) -> void:
 	var my_id := multiplayer.get_unique_id()
 	var now := Time.get_ticks_msec()
 
-	if not storm.is_empty():
+	if storm.is_empty():
+		storm_visual.reset()
+	else:
 		storm_visual.set_state(
 			float(storm.get("cx", 0.0)),
 			float(storm.get("cz", 0.0)),
@@ -354,6 +536,10 @@ func _on_snapshot(snap: Dictionary, _tick: int, storm: Dictionary) -> void:
 					local_player.set_alive(alive)
 				if alive and local_player.global_position.distance_to(pos) > RECONCILE_DISTANCE:
 					local_player.global_position = pos
+				if not alive and String(_match_state.get("phase", "")) == "LIVE" and not _spectating:
+					_start_spectating()
+				elif alive and _spectating:
+					_stop_spectating()
 			if local_player != null and not appearance.is_empty():
 				local_player.apply_appearance(_appearance)
 			continue
@@ -433,7 +619,11 @@ func _on_player_died(victim: int, killer: int) -> void:
 			cause = "a bot"
 		elif killer != 0:
 			cause = "player %d" % killer
-		hud.show_message("Eliminated by %s — respawning..." % cause, 3.0)
+		if String(_match_state.get("phase", "")) == "LIVE":
+			_start_spectating()
+			hud.show_message("ELIMINATED by %s — spectating" % cause, 3.0)
+		else:
+			hud.show_message("Eliminated by %s — respawning..." % cause, 3.0)
 	elif killer == my_id:
 		if victim < 0:
 			hud.show_message("Eliminated a bot", 2.0)
@@ -443,19 +633,28 @@ func _on_player_died(victim: int, killer: int) -> void:
 func _on_player_respawned(pos: Vector3) -> void:
 	if local_player == null:
 		return
+	_stop_spectating()
 	local_player.global_position = pos
 	local_player.velocity = Vector3.ZERO
 	local_player.set_alive(true)
+	var phase := String(_match_state.get("phase", ""))
+	local_player.input_enabled = phase == "LIVE"
+	if touch.is_enabled():
+		touch.set_active(phase == "LIVE")
 	hud.set_health(100)
 	hud.set_armor(0)
 	hud.set_inventory(0, 0)
 	hud.set_heal(0, 0.0)
+	hud.set_kills(0)
 	var start_weapon := Weapons.get_weapon(0)
 	hud.set_weapon(0, int(start_weapon["mag"]), int(start_weapon["reserve"]), false)
 	_last_hp = 100
 	_last_armor = 0
 	_was_outside = false
-	hud.show_message("Respawned", 1.5)
+	if phase == "LIVE" or phase == "COUNTDOWN":
+		hud.show_message("DEPLOYED", 1.5)
+	else:
+		hud.show_message("Returned to lobby", 1.5)
 
 func _on_loot_result(message: String) -> void:
 	if message.is_empty():

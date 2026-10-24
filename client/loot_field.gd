@@ -18,6 +18,7 @@ var _time := 0.0
 func _ready() -> void:
 	Net.loot_state.connect(_on_loot_state)
 	Net.loot_taken.connect(_on_loot_taken)
+	Net.loot_reset.connect(reset)
 	_build_all()
 
 func _build_all() -> void:
@@ -94,11 +95,25 @@ func _build_visual(root: Node3D, item_type: String) -> void:
 	root.add_child(label)
 
 func _process(delta: float) -> void:
+	if not visible:
+		# Outside a live match the whole field is hidden; make sure a stale
+		# pickup prompt does not linger on the lobby screen.
+		if _nearest_id != -1:
+			_nearest_id = -1
+			prompt_changed.emit("", false)
+		return
 	_time += delta
 	for id in _nodes.keys():
 		var node: Node3D = _nodes[id]
 		if is_instance_valid(node) and node.visible:
 			node.rotation.y = _time * 0.9
+			# A Label3D at point-blank range fills the screen. Hide the world
+			# label when the local player is right on top of the item; the HUD
+			# prompt still shows the pickup hint.
+			var label := node.get_node_or_null("Label")
+			if label != null and local_player != null and is_instance_valid(local_player):
+				var dist: float = local_player.global_position.distance_to(node.global_position)
+				(label as Label3D).visible = dist > 2.2
 
 	var nearest := -1
 	var best := INF

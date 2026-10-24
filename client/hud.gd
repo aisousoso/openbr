@@ -6,6 +6,7 @@ const Weapons := preload("res://shared/weapons.gd")
 @onready var health_label: Label = $Root/TopLeft/Health
 @onready var armor_label: Label = $Root/TopLeft/Armor
 @onready var kills_label: Label = $Root/TopLeft/Kills
+@onready var alive_label: Label = $Root/TopLeft/Alive
 @onready var storm_label: Label = $Root/TopLeft/Storm
 @onready var weapon_label: Label = $Root/TopLeft/Weapon
 @onready var inventory_label: Label = $Root/TopLeft/Inventory
@@ -14,6 +15,7 @@ const Weapons := preload("res://shared/weapons.gd")
 @onready var message: Label = $Root/Message
 @onready var loot_prompt: Label = $Root/LootPrompt
 @onready var damage_flash: ColorRect = $Root/DamageFlash
+@onready var kill_feed: VBoxContainer = $Root/KillFeed
 
 var _message_left := 0.0
 
@@ -62,6 +64,44 @@ func set_loot_prompt(text: String, visible := true) -> void:
 
 func set_kills(value: int) -> void:
 	kills_label.text = "Kills %d" % value
+
+func set_alive(alive: int, total: int) -> void:
+	alive_label.text = "ALIVE %d / %d" % [alive, total]
+
+func push_kill_feed(text: String) -> void:
+	if text.is_empty():
+		return
+	var label := Label.new()
+	label.text = text
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	label.add_theme_font_size_override("font_size", 17)
+	label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.9))
+	label.add_theme_constant_override("outline_size", 5)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if text.contains("WINS"):
+		label.add_theme_color_override("font_color", Color(1.0, 0.84, 0.3, 1.0))
+	elif text.contains("STORM"):
+		label.add_theme_color_override("font_color", Color(0.55, 0.82, 1.0, 1.0))
+	else:
+		label.add_theme_color_override("font_color", Color(0.92, 0.95, 0.98, 1.0))
+	kill_feed.add_child(label)
+
+	while kill_feed.get_child_count() > 5:
+		var oldest := kill_feed.get_child(0)
+		kill_feed.remove_child(oldest)
+		oldest.queue_free()
+
+	var tween := create_tween()
+	tween.tween_interval(4.5)
+	tween.tween_property(label, "modulate:a", 0.0, 0.7)
+	tween.tween_callback(func() -> void:
+		if is_instance_valid(label):
+			label.queue_free()
+	)
+
+func clear_kill_feed() -> void:
+	for child in kill_feed.get_children():
+		child.queue_free()
 
 func set_weapon(index: int, mag: int, reserve: int, reloading := false) -> void:
 	var weapon_name := Weapons.name_of(index)

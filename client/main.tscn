@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://client/main.gd" id="1_main"]
 [ext_resource type="PackedScene" path="res://client/hud.tscn" id="2_hud"]
@@ -7,6 +7,7 @@
 [ext_resource type="PackedScene" path="res://client/storm.tscn" id="5_storm"]
 [ext_resource type="PackedScene" path="res://client/ui/lobby.tscn" id="6_lobby"]
 [ext_resource type="PackedScene" path="res://client/loot_field.tscn" id="7_loot"]
+[ext_resource type="PackedScene" path="res://client/ui/match_panel.tscn" id="8_match"]
 
 [node name="Main" type="Node3D"]
 script = ExtResource("1_main")
@@ -28,3 +29,5 @@ script = ExtResource("1_main")
 [node name="ConnectScreen" parent="." instance=ExtResource("4_connect")]
 
 [node name="Lobby" parent="." instance=ExtResource("6_lobby")]
+
+[node name="MatchPanel" parent="." instance=ExtResource("8_match")]

@@ -6,9 +6,17 @@ extends Node3D
 ##
 ## Responsibilities:
 ##  - load maps/verdant_reach.tscn (same colliders as the client)
+##  - run the Battle Royale match lifecycle (WAITING -> COUNTDOWN -> LIVE -> ENDED -> RESET)
 ##  - simulate one CharacterBody3D per player with shared/movement.gd
-##  - hitscan shooting, damage, death and respawn
+##  - hitscan shooting, damage, one-life elimination and placement
 ##  - cell-based interest management for snapshots
+##
+## Match flags:
+##   --min-players=N   players (humans + bots) needed to start (default 2)
+##   --countdown=N     seconds of the deploy countdown (default 8)
+##   --end-delay=N     seconds to show the result before returning to the lobby (default 10)
+##   --auto-start      skip the READY requirement (dev/tests; still needs one human)
+##   --dev-respawn     keep the old 3s respawn deathmatch loop (dev smoke tests only)
 
 const Movement := preload("res://shared/movement.gd")
 const Weapons := preload("res://shared/weapons.gd")
@@ -21,6 +29,11 @@ const ARENA := preload("res://maps/verdant_reach.tscn")
 
 const MAX_PLAYERS := 64
 const SNAPSHOT_HZ := 20.0
+
+const PHASE_WAITING := "WAITING"
+const PHASE_COUNTDOWN := "COUNTDOWN"
+const PHASE_LIVE := "LIVE"
+const PHASE_ENDED := "ENDED"
 
 const DEFAULT_WEAPON := 0
 const WEAPON_SWITCH_TIME := 0.25
@@ -64,6 +77,19 @@ var _bot_count := 0
 var _loot_taken := {}
 var _test_loot := false
 
+# Match lifecycle. Everything gameplay-related is gated on `_phase == PHASE_LIVE`.
+var _phase := PHASE_WAITING
+var _phase_timer := 0.0
+var _min_players := 2
+var _countdown_seconds := 8.0
+var _end_delay := 10.0
+var _auto_start := false
+var _dev_respawn := false
+var _winner_id := 0
+var _placement := {}
+var _match_number := 0
+var _spawn_cursor := 0
+
 func _ready() -> void:
 	allow_dev = "--dev-auth" in _all_args()
 	# Debug aids for local testing: speed storm timers up 10x and optionally
@@ -72,6 +98,11 @@ func _ready() -> void:
 	_run_seconds = float(_arg("--run-seconds", "0"))
 	_bot_count = clampi(int(_arg("--bots", "0")), 0, BOT_MAX)
 	_test_loot = "--test-loot" in _all_args()
+	_min_players = maxi(1, int(_arg("--min-players", "2")))
+	_countdown_seconds = maxf(0.0, float(_arg("--countdown", "8")))
+	_end_delay = maxf(0.0, float(_arg("--end-delay", "10")))
+	_auto_start = "--auto-start" in _all_args()
+	_dev_respawn = "--dev-respawn" in _all_args()
 	_storm = _new_storm()
 
 	var arena := ARENA.instantiate()
@@ -87,6 +118,7 @@ func _ready() -> void:
 	Net.loot_requested.connect(_on_loot_requested)
 	Net.use_item_requested.connect(_on_use_item_requested)
 	Net.peer_disconnected.connect(_on_peer_disconnected)
+	Net.ready_requested.connect(_on_ready_requested)
 
 	var port := int(_arg("--port", "7777"))
 	var err := Net.host_game(port, MAX_PLAYERS)
@@ -94,7 +126,7 @@ func _ready() -> void:
 		push_error("failed to host on udp/%d: %s" % [port, error_string(err)])
 		get_tree().quit(1)
 		return
-	print("OpenBR server listening on udp/%d (map=%s, dev_auth=%s, spawns=%d, bots=%d, storm_scale=%.2f)" % [port, MapData.NAME, allow_dev, _spawns.size(), _bot_count, _storm_time_scale])
+	print("OpenBR server listening on udp/%d (map=%s, dev_auth=%s, spawns=%d, bots=%d, storm_scale=%.2f, min_players=%d, countdown=%.0fs, auto_start=%s, dev_respawn=%s)" % [port, MapData.NAME, allow_dev, _spawns.size(), _bot_count, _storm_time_scale, _min_players, _countdown_seconds, _auto_start, _dev_respawn])
 
 func _physics_process(delta: float) -> void:
 	if _run_seconds > 0.0:
@@ -105,35 +137,40 @@ func _physics_process(delta: float) -> void:
 			return
 
 	var now := Time.get_ticks_msec() / 1000.0
-	_update_weapons(now)
-	_update_healing(now)
-	_update_bots(now)
+	_update_match(delta)
 
-	for id in players:
-		var p: Dictionary = players[id]
-		if not p["alive"]:
-			var dead_body: CharacterBody3D = p["body"]
-			if not dead_body.is_on_floor():
-				dead_body.velocity.y -= Movement.GRAVITY * delta
-				dead_body.move_and_slide()
-				p["pos"] = dead_body.global_position
-				_update_cell(id, p)
-			if now >= float(p["respawn_at"]):
-				_respawn(id, p)
-			continue
+	if _phase == PHASE_LIVE:
+		_update_weapons(now)
+		_update_healing(now)
+		_update_bots(now)
 
-		var body: CharacterBody3D = p["body"]
-		Movement.step_body(body, p["input_dir"], p["yaw"], p["jump"], delta)
-		p["jump"] = false
-		p["pos"] = body.global_position
-		_update_cell(id, p)
+		for id in players:
+			var p: Dictionary = players[id]
+			if not p["alive"]:
+				var dead_body: CharacterBody3D = p["body"]
+				if not dead_body.is_on_floor():
+					dead_body.velocity.y -= Movement.GRAVITY * delta
+					dead_body.move_and_slide()
+					p["pos"] = dead_body.global_position
+					_update_cell(id, p)
+				if _dev_respawn and now >= float(p["respawn_at"]):
+					_respawn(id, p)
+				continue
 
-	# Resolve queued shots inside the physics tick so space-state queries are safe.
-	for shot in _pending_shots:
-		_resolve_shot(int(shot[0]), shot[1], int(shot[2]))
-	_pending_shots.clear()
+			var body: CharacterBody3D = p["body"]
+			Movement.step_body(body, p["input_dir"], p["yaw"], p["jump"], delta)
+			p["jump"] = false
+			p["pos"] = body.global_position
+			_update_cell(id, p)
 
-	_update_storm(delta)
+		# Resolve queued shots inside the physics tick so space-state queries are safe.
+		for shot in _pending_shots:
+			_resolve_shot(int(shot[0]), shot[1], int(shot[2]))
+		_pending_shots.clear()
+
+		_update_storm(delta)
+	else:
+		_pending_shots.clear()
 
 	snap_acc += delta
 	if snap_acc < 1.0 / SNAPSHOT_HZ:
@@ -142,10 +179,263 @@ func _physics_process(delta: float) -> void:
 	tick += 1
 	_send_snapshots()
 
+# ---------------------------------------------------------------- match lifecycle
+
+func _update_match(delta: float) -> void:
+	match _phase:
+		PHASE_WAITING:
+			if _can_start():
+				_begin_countdown()
+		PHASE_COUNTDOWN:
+			if not _can_still_start():
+				_cancel_countdown()
+				return
+			_phase_timer = maxf(0.0, _phase_timer - delta)
+			if _phase_timer <= 0.0:
+				_start_match()
+		PHASE_ENDED:
+			_phase_timer = maxf(0.0, _phase_timer - delta)
+			if _phase_timer <= 0.0:
+				_reset_match()
+
+func _can_start() -> bool:
+	if players.is_empty() or players.size() < _min_players:
+		return false
+	if _auto_start:
+		# Bots alone must never start a match; at least one human has to be in.
+		return _human_count() > 0
+	var human_ready := false
+	for id in players:
+		var p: Dictionary = players[id]
+		if p.get("bot", false):
+			continue
+		if bool(p.get("ready", false)):
+			human_ready = true
+			break
+	return human_ready and _ready_count() >= _min_players
+
+func _can_still_start() -> bool:
+	if players.size() < _min_players:
+		return false
+	return _auto_start or _human_count() > 0
+
+func _begin_countdown() -> void:
+	_phase = PHASE_COUNTDOWN
+	_phase_timer = _countdown_seconds
+	_winner_id = 0
+	_placement.clear()
+	print("match countdown started (%.0fs, %d/%d players)" % [_countdown_seconds, players.size(), _min_players])
+	Net.announce_kill_feed("MATCH STARTING")
+	if _countdown_seconds <= 0.0:
+		_start_match()
+	else:
+		_broadcast_match_state()
+
+func _cancel_countdown() -> void:
+	_phase = PHASE_WAITING
+	_phase_timer = 0.0
+	print("match countdown cancelled (not enough players)")
+	Net.announce_kill_feed("COUNTDOWN CANCELLED")
+	_broadcast_match_state()
+
+func _start_match() -> void:
+	_match_number += 1
+	_phase = PHASE_LIVE
+	_phase_timer = 0.0
+	_winner_id = 0
+	_placement.clear()
+	_loot_taken.clear()
+	_storm = _new_storm()
+	_storm_damage_acc = 0.0
+	_spawn_cursor = 0
+
+	for id in players.keys():
+		_reset_player_for_match(id, players[id])
+		if _test_loot and not players[id].get("bot", false):
+			# Keep the loot/heal smoke test meaningful: the player starts hurt.
+			players[id]["health"] = 60
+
+	for id in players:
+		if not players[id].get("bot", false):
+			Net.send_loot_reset(id)
+
+	_broadcast_match_state()
+	Net.announce_kill_feed("MATCH %d STARTED" % _match_number)
+	print("match %d LIVE (%d players, %d humans)" % [_match_number, players.size(), _human_count()])
+
+func _reset_player_for_match(id: int, p: Dictionary) -> void:
+	var spawn := _next_match_spawn()
+	var body: CharacterBody3D = p["body"]
+	if is_instance_valid(body):
+		body.global_position = spawn
+		body.velocity = Vector3.ZERO
+
+	p["pos"] = spawn
+	p["yaw"] = randf_range(-PI, PI)
+	p["input_dir"] = Vector2.ZERO
+	p["jump"] = false
+	p["health"] = 100
+	p["alive"] = true
+	p["kills"] = 0
+	p["respawn_at"] = 0.0
+	Inventory.reset(p)
+	p["weapon"] = clampi(int(p.get("preferred_weapon", DEFAULT_WEAPON)), 0, Weapons.count() - 1)
+	p["ammo"] = Weapons.fresh_ammo()
+	if p.get("bot", false):
+		for i in p["ammo"]:
+			p["ammo"][i]["reserve"] = 999
+	p["reload_until"] = 0.0
+	p["switch_until"] = 0.0
+	p["ready"] = false
+	_update_cell(id, p)
+
+	if not p.get("bot", false):
+		Net.send_respawn(id, spawn)
+
+func _next_match_spawn() -> Vector3:
+	if _spawns.is_empty():
+		return Vector3(0.0, 0.7, 0.0)
+	var spawn := _spawns[_spawn_cursor % _spawns.size()]
+	_spawn_cursor += 1
+	return spawn
+
+func _reset_match() -> void:
+	_phase = PHASE_WAITING
+	_phase_timer = 0.0
+	_winner_id = 0
+	_placement.clear()
+	_loot_taken.clear()
+	_storm = _new_storm()
+	_storm_damage_acc = 0.0
+	_spawn_cursor = 0
+
+	for id in players.keys():
+		_reset_player_for_match(id, players[id])
+		players[id]["ready"] = _auto_start
+
+	for id in players:
+		if not players[id].get("bot", false):
+			Net.send_loot_reset(id)
+
+	_broadcast_match_state()
+	Net.announce_kill_feed("RETURNED TO LOBBY")
+	print("match reset -> WAITING (%d players)" % players.size())
+
+func _check_match_end() -> void:
+	if _phase != PHASE_LIVE:
+		return
+	var alive_ids: Array = []
+	for id in players:
+		if players[id]["alive"]:
+			alive_ids.append(id)
+	if alive_ids.size() > 1:
+		return
+
+	_winner_id = int(alive_ids[0]) if alive_ids.size() == 1 else 0
+	if _winner_id != 0:
+		_placement[_winner_id] = 1
+		Net.announce_kill_feed("%s WINS THE MATCH" % _display_name(_winner_id))
+		print("match %d winner: %s (%d)" % [_match_number, _display_name(_winner_id), _winner_id])
+	else:
+		Net.announce_kill_feed("NO SURVIVORS")
+		print("match %d ended with no survivors" % _match_number)
+
+	_phase = PHASE_ENDED
+	_phase_timer = _end_delay
+	_broadcast_match_state()
+	if _end_delay <= 0.0:
+		_reset_match()
+
+func _on_ready_requested(id: int, ready: bool) -> void:
+	var p = players.get(id)
+	if p == null or p.get("bot", false):
+		return
+	if _phase != PHASE_WAITING:
+		return
+	p["ready"] = ready
+	print("peer %d ready=%s (%d/%d)" % [id, ready, _ready_count(), _min_players])
+	_broadcast_match_state()
+
+func _match_state_for(id: int) -> Dictionary:
+	var p: Dictionary = players.get(id, {})
+	return {
+		"phase": _phase,
+		"timer": maxf(0.0, _phase_timer),
+		"alive": _alive_count(),
+		"total": players.size(),
+		"ready": _ready_count(),
+		"min_players": _min_players,
+		"you": id,
+		"you_ready": bool(p.get("ready", false)),
+		"you_alive": bool(p.get("alive", false)),
+		"placement": int(_placement.get(id, 0)),
+		"winner": _winner_id,
+		"winner_name": _display_name(_winner_id) if _winner_id != 0 else "",
+		"match": _match_number,
+		"roster": _roster(),
+	}
+
+func _broadcast_match_state() -> void:
+	for id in players:
+		if players[id].get("bot", false):
+			continue
+		Net.send_match_state(id, _match_state_for(id))
+
+func _roster() -> Array:
+	var out: Array = []
+	for id in players:
+		var p: Dictionary = players[id]
+		out.append({
+			"id": id,
+			"name": _display_name(id),
+			"alive": bool(p["alive"]),
+			"bot": bool(p.get("bot", false)),
+		})
+	return out
+
+func _display_name(id: int) -> String:
+	if id == 0:
+		return "the storm"
+	var p = players.get(id)
+	if p == null:
+		return "player %d" % id
+	var look: Dictionary = p.get("appearance", {})
+	return String(Characters.get_character(int(look.get("character", 0)))["name"])
+
+func _alive_count() -> int:
+	var count := 0
+	for id in players:
+		if players[id]["alive"]:
+			count += 1
+	return count
+
+func _ready_count() -> int:
+	var count := 0
+	for id in players:
+		var p: Dictionary = players[id]
+		if p.get("bot", false) or bool(p.get("ready", false)):
+			count += 1
+	return count
+
+func _human_count() -> int:
+	var count := 0
+	for id in players:
+		if not players[id].get("bot", false):
+			count += 1
+	return count
+
 # ---------------------------------------------------------------- auth / peers
 
 func _on_auth_requested(id: int, token: String, appearance: Dictionary) -> void:
 	if players.has(id):
+		return
+	if _phase != PHASE_WAITING:
+		print("peer %d rejected (match in progress, phase=%s)" % [id, _phase])
+		Net.reject(id, "match in progress")
+		return
+	if players.size() >= MAX_PLAYERS:
+		print("peer %d rejected (server full)" % id)
+		Net.reject(id, "server full")
 		return
 
 	var ok := allow_dev and token == "dev"
@@ -159,11 +449,13 @@ func _on_auth_requested(id: int, token: String, appearance: Dictionary) -> void:
 		return
 
 	var p := _create_player(id, false, DEFAULT_WEAPON, appearance)
+	p["ready"] = _auto_start
 	if _test_loot:
 		# Dev-only hook so the loot/heal smoke test can exercise a real heal.
 		p["health"] = 60
 	Net.spawn_for(id, p["pos"])
 	Net.send_loot_state(id, _loot_taken.keys())
+	Net.send_match_state(id, _match_state_for(id))
 	print("peer %d authenticated (operator %s)" % [id, Characters.get_character(int(p["appearance"]["character"]))["name"]])
 
 func _create_player(id: int, is_bot: bool, weapon_index := DEFAULT_WEAPON, appearance: Dictionary = {}) -> Dictionary:
@@ -200,6 +492,7 @@ func _create_player(id: int, is_bot: bool, weapon_index := DEFAULT_WEAPON, appea
 		"reload_until": 0.0,
 		"switch_until": 0.0,
 		"bot": is_bot,
+		"ready": is_bot,
 		"appearance": appearance_data,
 	}
 	p.merge(Inventory.new_state())
@@ -221,17 +514,32 @@ func _on_peer_disconnected(id: int) -> void:
 	var p = players.get(id)
 	if p == null:
 		return
+
+	if _phase == PHASE_LIVE and bool(p["alive"]) and not p.get("bot", false):
+		# A disconnect is an elimination so the remaining players can still win.
+		_placement[id] = _alive_count()
+		Net.announce_kill_feed("%s LEFT THE MATCH" % _display_name(id))
+		print("peer %d left during LIVE (placement %d)" % [id, int(_placement[id])])
+
 	_remove_from_cell(id, p["cell"])
 	var body: CharacterBody3D = p["body"]
 	if is_instance_valid(body):
 		body.queue_free()
 	players.erase(id)
 	Net.announce_left(id)
+
+	if _phase == PHASE_LIVE:
+		_broadcast_match_state()
+		_check_match_end()
+	elif _phase == PHASE_WAITING or _phase == PHASE_COUNTDOWN:
+		_broadcast_match_state()
 	print("peer %d left" % id)
 
 # ---------------------------------------------------------------- input / shooting
 
 func _on_input_received(id: int, dir: Vector2, yaw: float, jump: bool) -> void:
+	if _phase != PHASE_LIVE:
+		return
 	var p = players.get(id)
 	if p == null or not p["alive"]:
 		return
@@ -342,6 +650,8 @@ func _bot_try_fire(id: int, p: Dictionary, target: Dictionary, now: float) -> vo
 		_start_reload(id, p, now)
 
 func _on_fire_requested(id: int, dir: Vector3) -> void:
+	if _phase != PHASE_LIVE:
+		return
 	var p = players.get(id)
 	if p == null or not p["alive"]:
 		return
@@ -374,6 +684,8 @@ func _on_fire_requested(id: int, dir: Vector3) -> void:
 		_start_reload(id, p, now)
 
 func _on_weapon_requested(id: int, index: int) -> void:
+	if _phase != PHASE_LIVE:
+		return
 	var p = players.get(id)
 	if p == null or not p["alive"]:
 		return
@@ -388,12 +700,16 @@ func _on_weapon_requested(id: int, index: int) -> void:
 	p["switch_until"] = Time.get_ticks_msec() / 1000.0 + WEAPON_SWITCH_TIME
 
 func _on_reload_requested(id: int) -> void:
+	if _phase != PHASE_LIVE:
+		return
 	var p = players.get(id)
 	if p == null or not p["alive"]:
 		return
 	_start_reload(id, p, Time.get_ticks_msec() / 1000.0)
 
 func _on_loot_requested(id: int, loot_id: int) -> void:
+	if _phase != PHASE_LIVE:
+		return
 	var p = players.get(id)
 	if p == null or not p["alive"]:
 		return
@@ -423,6 +739,8 @@ func _on_loot_requested(id: int, loot_id: int) -> void:
 	Net.send_loot_result(id, String(result["message"]))
 
 func _on_use_item_requested(id: int, item_type: String) -> void:
+	if _phase != PHASE_LIVE:
+		return
 	var p = players.get(id)
 	if p == null or not p["alive"]:
 		return
@@ -544,14 +862,15 @@ func _send_death_events(victim_id: int, killer_id: int) -> void:
 			Net.send_death(id, victim_id, killer_id)
 
 func _apply_damage(victim_id: int, killer_id: int, now: float, amount := 25, ignore_armor := false) -> void:
-	var victim: Dictionary = players[victim_id]
+	var victim = players.get(victim_id)
+	if victim == null or not victim["alive"]:
+		return
 
 	var result := Inventory.apply_damage(victim, amount, ignore_armor)
 	if not bool(result["dead"]):
 		return
 
 	victim["alive"] = false
-	victim["respawn_at"] = now + RESPAWN_TIME
 	var body: CharacterBody3D = victim["body"]
 	body.velocity = Vector3.ZERO
 
@@ -559,10 +878,24 @@ func _apply_damage(victim_id: int, killer_id: int, now: float, amount := 25, ign
 		var killer: Dictionary = players[killer_id]
 		killer["kills"] = int(killer["kills"]) + 1
 	_send_death_events(victim_id, killer_id)
+
 	if killer_id == 0:
+		Net.announce_kill_feed("%s WAS ELIMINATED BY THE STORM" % _display_name(victim_id))
 		print("storm eliminated peer %d" % victim_id)
 	else:
+		Net.announce_kill_feed("%s ELIMINATED %s" % [_display_name(killer_id), _display_name(victim_id)])
 		print("peer %d eliminated peer %d" % [killer_id, victim_id])
+
+	if _phase == PHASE_LIVE and not _dev_respawn:
+		# Placement is assigned at elimination: the first death in a 4-player
+		# match is 4th, the winner is 1st.
+		_placement[victim_id] = _alive_count() + 1
+		_broadcast_match_state()
+		_check_match_end()
+	elif _dev_respawn:
+		victim["respawn_at"] = now + RESPAWN_TIME
+	else:
+		victim["respawn_at"] = 0.0
 
 func _respawn(id: int, p: Dictionary) -> void:
 	var spawn: Vector3 = _safe_spawn()
@@ -655,6 +988,8 @@ func _update_storm(delta: float) -> void:
 	var radius := float(_storm["radius"])
 
 	for id in players.keys():
+		if _phase != PHASE_LIVE:
+			break
 		var p: Dictionary = players[id]
 		if not p["alive"]:
 			continue
@@ -766,7 +1101,8 @@ func _remove_from_cell(id: int, cell: Vector2i) -> void:
 		cells.erase(cell)
 
 func _send_snapshots() -> void:
-	var storm_state := _storm_public()
+	# The storm only exists during LIVE; the client hides its wall otherwise.
+	var storm_state := _storm_public() if _phase == PHASE_LIVE else {}
 	for id in players:
 		var p: Dictionary = players[id]
 		if p.get("bot", false):
@@ -776,6 +1112,14 @@ func _send_snapshots() -> void:
 func _snapshot_for(viewer_id: int, viewer: Dictionary) -> Dictionary:
 	var out := {}
 	out[viewer_id] = _pack(viewer)
+
+	# Dead players are spectators: they need to see every survivor so the
+	# client can follow one with the spectator camera, even across the map.
+	if not viewer["alive"]:
+		for id in players:
+			if id != viewer_id:
+				out[id] = _pack(players[id])
+		return out
 
 	var origin: Vector3 = viewer["pos"]
 	var radius_sq := INTEREST_RADIUS * INTEREST_RADIUS
