@@ -477,17 +477,30 @@ adb install -r build/OpenBR-release.apk
 > `adb uninstall org.openbr.game`.
 >
 > تم التحقق من البناء والتوقيع وبنية الحزمة، لكن **اللعب الفعلي على الهاتف**
-> (لمس + شبكة LAN) لم يُختبر بعد بشكل كامل.
+> (لمس + شبكة LAN) لم يُختبر بعد لعدم وجود جهاز متصل. القائمة الكاملة
+> وخطوات الاختبار في [`docs/TESTING.md`](docs/TESTING.md).
 
 ### بناء APK تلقائيًا عبر GitHub Actions
 
 أضفت workflow جاهزًا في `.github/workflows/android.yml` لبناء **debug APK** على GitHub
-دون تثبيت Godot أو Android SDK على جهازك:
+دون تثبيت Godot أو Android SDK على جهازك.
 
-1. ارفع المشروع إلى GitHub (المجلد ليس مستودع Git حاليًا).
-2. من المستودع: **Actions** > **Android APK** > **Run workflow**.
-3. بعد انتهاء البناء، نزّل الـartifact باسم `OpenBR-android-debug` من صفحة الـrun.
-4. ثبّت الـAPK: `adb install -r OpenBR.apk`.
+المستودع المحلي مهيّأ على `main` مع commit أول، لكنه **بلا remote وبلا push**
+حتى الآن لعدم وجود مصادقة GitHub. بعد إضافة remote:
+
+```powershell
+git remote add origin https://github.com/<USER>/<REPO>.git
+git push -u origin main
+```
+
+ثم:
+
+1. من المستودع: **Actions** > **Android APK** > **Run workflow**.
+2. بعد انتهاء البناء، نزّل الـartifact باسم `OpenBR-android-debug` من صفحة الـrun.
+3. ثبّت الـAPK: `adb install -r OpenBR.apk`.
+
+للتحقق على هاتف حقيقي، راجع [`docs/TESTING.md`](docs/TESTING.md) وسكربت
+`scripts/android-device-test.ps1`.
 
 ماذا يفعل الـworkflow؟
 

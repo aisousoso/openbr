@@ -340,12 +340,22 @@ Invoke-RestMethod -Method Post -Uri http://localhost:8080/v1/match `
 
 ## 10) GitHub Actions
 
-workflow جاهز في `.github/workflows/android.yml` لبناء **debug APK** فقط:
+workflow جاهز في `.github/workflows/android.yml` لبناء **debug APK** فقط.
 
-1. ارفع المشروع إلى GitHub.
-2. **Actions** > **Android APK** > **Run workflow**.
-3. نزّل artifact `OpenBR-android-debug`.
-4. `adb install -r OpenBR.apk`.
+المستودع المحلي مهيّأ على فرع `main` مع commit أول
+(`086f2f0 Initial OpenBR prototype...`)، لكن **لم يُضف remote ولم يُدفع** بعد
+لعدم وجود مصادقة GitHub على هذا الجهاز. بعد إضافة remote:
+
+```powershell
+git remote add origin https://github.com/<USER>/<REPO>.git
+git push -u origin main
+```
+
+ثم:
+
+1. **Actions** > **Android APK** > **Run workflow**.
+2. نزّل artifact `OpenBR-android-debug`.
+3. `adb install -r OpenBR.apk`.
 
 الـworkflow يثبّت JDK 17 وGodot 4.4.1 + export templates وAndroid SDK، وينسخ
 `export_presets.cfg.example`، ثم يصدّر debug APK.
@@ -353,6 +363,9 @@ workflow جاهز في `.github/workflows/android.yml` لبناء **debug APK** 
 > الـworkflow لا يملك مفاتيح release، ولا يبني AAB. لا تضع keystore أو كلمة السر
 > في Git أو في أسرار الـworkflow إلا بعد فهم مخاطرها. الـworkflow نفسه لم يُشغّل
 > على GitHub بعد؛ راجع سجل Actions إذا فشل أي step.
+
+لاختبار جهاز فعلي، راجع [`docs/TESTING.md`](TESTING.md): يحتوي سكربت
+`scripts/android-device-test.ps1` وقائمة اختبار اللمس وLAN وAndroid 5/6.
 
 ---
 
