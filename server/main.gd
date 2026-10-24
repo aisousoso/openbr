@@ -94,7 +94,13 @@ func _ready() -> void:
 	allow_dev = "--dev-auth" in _all_args()
 	# Debug aids for local testing: speed storm timers up 10x and optionally
 	# quit after a fixed wall-clock duration so redirected logs flush cleanly.
-	_storm_time_scale = 10.0 if "--storm-fast" in _all_args() else 1.0
+	var _storm_scale_arg := _arg("--storm-scale", "")
+	if not _storm_scale_arg.is_empty():
+		_storm_time_scale = maxf(0.01, float(_storm_scale_arg))
+	elif "--storm-fast" in _all_args():
+		_storm_time_scale = 10.0
+	else:
+		_storm_time_scale = 1.0
 	_run_seconds = float(_arg("--run-seconds", "0"))
 	_bot_count = clampi(int(_arg("--bots", "0")), 0, BOT_MAX)
 	_test_loot = "--test-loot" in _all_args()

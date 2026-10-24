@@ -23,7 +23,7 @@ const FIRE_RADIUS := 58.0
 const JUMP_RADIUS := 44.0
 const RELOAD_RADIUS := 40.0
 const SWAP_RADIUS := 40.0
-const LOOT_RADIUS := 40.0
+const LOOT_RADIUS := 48.0
 const BAND_RADIUS := 36.0
 const MED_RADIUS := 36.0
 
