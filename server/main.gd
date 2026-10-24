@@ -27,7 +27,7 @@ const MapData := preload("res://shared/map_data.gd")
 const Auth := preload("res://server/auth.gd")
 const ARENA := preload("res://maps/verdant_reach.tscn")
 
-const MAX_PLAYERS := 64
+const MAX_PLAYERS := 128
 const SNAPSHOT_HZ := 20.0
 
 const PHASE_WAITING := "WAITING"
@@ -42,22 +42,22 @@ const EYE_HEIGHT := 1.65
 const BODY_CENTER := 0.9
 const HIT_RADIUS := 0.6
 
-const BOT_MAX := 16
+const BOT_MAX := 32
 const BOT_AIM_ERROR := 0.03
 
 const CELL_SIZE := 20.0
-const INTEREST_RADIUS := 45.0
+const INTEREST_RADIUS := 35.0
 
 # Storm phases: wait before the next shrink, shrink duration, target radius and
 # damage per second for players outside the safe zone. The first wait is a
 # grace period with no storm damage.
 const STORM_CENTER := Vector2(0.0, 0.0)
-const STORM_START_RADIUS := 54.0
+const STORM_START_RADIUS := 70.0
 const STORM_FINAL_DPS := 8.0
 const STORM_PHASES := [
-	{"wait": 25.0, "shrink": 22.0, "radius": 38.0, "dps": 2.0},
-	{"wait": 12.0, "shrink": 16.0, "radius": 22.0, "dps": 4.0},
-	{"wait": 10.0, "shrink": 12.0, "radius": 10.0, "dps": 6.0},
+	{"wait": 30.0, "shrink": 30.0, "radius": 45.0, "dps": 2.0},
+	{"wait": 15.0, "shrink": 20.0, "radius": 25.0, "dps": 4.0},
+	{"wait": 10.0, "shrink": 15.0, "radius": 10.0, "dps": 6.0},
 ]
 
 var players := {}

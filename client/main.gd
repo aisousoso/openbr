@@ -459,7 +459,7 @@ func _on_snapshot(snap: Dictionary, _tick: int, storm: Dictionary) -> void:
 		storm_visual.set_state(
 			float(storm.get("cx", 0.0)),
 			float(storm.get("cz", 0.0)),
-			float(storm.get("radius", 48.0))
+			float(storm.get("radius", 70.0))
 		)
 
 	for id in snap:
