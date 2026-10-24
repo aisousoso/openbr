@@ -1,0 +1,8 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://server/main.gd" id="1_server"]
+
+[node name="Server" type="Node3D"]
+script = ExtResource("1_server")
+
+[node name="Players" type="Node3D" parent="."]

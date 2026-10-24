@@ -1,0 +1,20 @@
+# Normalize text files to LF so Linux CI and Windows checkouts agree.
+* text=auto eol=lf
+
+# Windows-only scripts keep CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary assets.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.ogg binary
+*.wav binary
+*.apk binary
+*.aab binary
+*.idsig binary
+*.jar binary
+*.keystore binary
+*.jks binary

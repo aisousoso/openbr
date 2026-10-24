@@ -1,0 +1,30 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="Script" path="res://client/main.gd" id="1_main"]
+[ext_resource type="PackedScene" path="res://client/hud.tscn" id="2_hud"]
+[ext_resource type="PackedScene" path="res://client/ui/touch_controls.tscn" id="3_touch"]
+[ext_resource type="PackedScene" path="res://client/ui/connect_screen.tscn" id="4_connect"]
+[ext_resource type="PackedScene" path="res://client/storm.tscn" id="5_storm"]
+[ext_resource type="PackedScene" path="res://client/ui/lobby.tscn" id="6_lobby"]
+[ext_resource type="PackedScene" path="res://client/loot_field.tscn" id="7_loot"]
+
+[node name="Main" type="Node3D"]
+script = ExtResource("1_main")
+
+[node name="World" type="Node3D" parent="."]
+
+[node name="Players" type="Node3D" parent="."]
+
+[node name="Effects" type="Node3D" parent="."]
+
+[node name="Storm" parent="." instance=ExtResource("5_storm")]
+
+[node name="LootField" parent="." instance=ExtResource("7_loot")]
+
+[node name="HUD" parent="." instance=ExtResource("2_hud")]
+
+[node name="Touch" parent="." instance=ExtResource("3_touch")]
+
+[node name="ConnectScreen" parent="." instance=ExtResource("4_connect")]
+
+[node name="Lobby" parent="." instance=ExtResource("6_lobby")]

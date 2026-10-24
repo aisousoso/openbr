@@ -1,0 +1,49 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://client/storm.gd" id="1_storm"]
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_wall"]
+top_radius = 1.0
+bottom_radius = 1.0
+height = 1.0
+radial_segments = 96
+rings = 1
+cap_top = false
+cap_bottom = false
+
+[sub_resource type="StandardMaterial3D" id="Mat_wall"]
+transparency = 1
+shading_mode = 0
+cull_mode = 2
+albedo_color = Color(0.55, 0.25, 0.95, 0.14)
+emission_enabled = true
+emission = Color(0.35, 0.1, 0.8, 1)
+emission_energy_multiplier = 0.8
+
+[sub_resource type="TorusMesh" id="TorusMesh_ring"]
+inner_radius = 0.99
+outer_radius = 1.01
+rings = 96
+ring_segments = 8
+
+[sub_resource type="StandardMaterial3D" id="Mat_ring"]
+shading_mode = 0
+albedo_color = Color(0.75, 0.45, 1, 1)
+emission_enabled = true
+emission = Color(0.6, 0.25, 1, 1)
+emission_energy_multiplier = 2.0
+
+[node name="Storm" type="Node3D"]
+script = ExtResource("1_storm")
+
+[node name="Wall" type="MeshInstance3D" parent="."]
+position = Vector3(0, 15, 0)
+mesh = SubResource("CylinderMesh_wall")
+material_override = SubResource("Mat_wall")
+cast_shadow = 0
+
+[node name="Ring" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.08, 0)
+mesh = SubResource("TorusMesh_ring")
+material_override = SubResource("Mat_ring")
+cast_shadow = 0

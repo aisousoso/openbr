@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://client/loot_field.gd" id="1_loot"]
+
+[node name="LootField" type="Node3D"]
+script = ExtResource("1_loot")

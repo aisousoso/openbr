@@ -1,0 +1,10 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://client/remote_player.gd" id="1_remote"]
+[ext_resource type="Script" path="res://shared/character_model.gd" id="2_model"]
+
+[node name="RemotePlayer" type="Node3D"]
+script = ExtResource("1_remote")
+
+[node name="Model" type="Node3D" parent="."]
+script = ExtResource("2_model")
