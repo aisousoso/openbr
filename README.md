@@ -586,7 +586,8 @@ openbr/
 - [x] بناء debug APK محليًا والتحقق من التوقيع (`build/OpenBR.apk`)
 - [x] بناء release APK موقّع (`build/OpenBR-release.apk`)
 - [x] بناء release AAB موقّع + `bundletool validate` (`build/OpenBR-release.aab`)
-- [x] GitHub Actions workflow لبناء debug APK (يحتاج تشغيلًا للتحقق)
+- [ ] تشغيل GitHub Actions فعليًا بعد إضافة remote والدفع (الـworkflow جاهز)
+- [ ] اختبار اللمس واللعب LAN على هاتف Android حقيقي (بانتظار جهاز متصل)
 - [x] الدائرة المتقلصة (storm) — خادم سلطوي + رسم على العميل + HUD + respawn آمن
 - [x] أسلحة متعددة (Rifle/SMG/Shotgun) + ذخيرة + إعادة تلقيم + تبديل
 - [x] بوتات اختبار server-only (`--bots=N`, حتى 16)
