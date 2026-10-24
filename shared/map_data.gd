@@ -5,7 +5,7 @@
 ## sides drifting apart.
 
 const NAME := "VERDANT REACH"
-const HALF_SIZE := 60.0
+const HALF_SIZE := 100.0
 
 ## Region centres and the colours used for ground patches and map labels.
 const REGIONS := [

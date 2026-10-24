@@ -28,7 +28,7 @@ const Auth := preload("res://server/auth.gd")
 const ARENA := preload("res://maps/verdant_reach.tscn")
 
 const MAX_PLAYERS := 128
-const SNAPSHOT_HZ := 20.0
+const SNAPSHOT_HZ := 15.0
 
 const PHASE_WAITING := "WAITING"
 const PHASE_COUNTDOWN := "COUNTDOWN"
@@ -52,7 +52,7 @@ const INTEREST_RADIUS := 35.0
 # damage per second for players outside the safe zone. The first wait is a
 # grace period with no storm damage.
 const STORM_CENTER := Vector2(0.0, 0.0)
-const STORM_START_RADIUS := 70.0
+const STORM_START_RADIUS := 85.0
 const STORM_FINAL_DPS := 8.0
 const STORM_PHASES := [
 	{"wait": 30.0, "shrink": 30.0, "radius": 45.0, "dps": 2.0},
@@ -75,6 +75,9 @@ var _run_seconds := 0.0
 var _run_elapsed := 0.0
 var _bot_count := 0
 var _loot_taken := {}
+var _dynamic_loot := {}  # id -> {type, pos, respawn_at}
+var _next_dynamic_id := 10000
+const LOOT_RESPAWN_DELAY := 30.0
 var _test_loot := false
 
 # Match lifecycle. Everything gameplay-related is gated on `_phase == PHASE_LIVE`.
@@ -183,6 +186,23 @@ func _physics_process(delta: float) -> void:
 		return
 	snap_acc -= 1.0 / SNAPSHOT_HZ
 	tick += 1
+
+	# Dynamic loot respawn check.
+	var now2 := Time.get_ticks_msec() / 1000.0
+	var to_spawn := []
+	for dl_id in _dynamic_loot.keys():
+		var dl: Dictionary = _dynamic_loot[dl_id]
+		if dl.has("taken"):
+			continue
+		if not dl.has("respawn_at"):
+			continue
+		if now2 >= float(dl["respawn_at"]):
+			to_spawn.append(dl_id)
+	for dl_id in to_spawn:
+		var dl: Dictionary = _dynamic_loot[dl_id]
+		Net.announce_loot_spawned(dl_id, String(dl["type"]), dl["pos"])
+		_dynamic_loot[dl_id]["respawn_at"] = -1.0  # Mark as spawned.
+
 	_send_snapshots()
 
 # ---------------------------------------------------------------- match lifecycle
@@ -251,6 +271,8 @@ func _start_match() -> void:
 	_winner_id = 0
 	_placement.clear()
 	_loot_taken.clear()
+	_dynamic_loot.clear()
+	_next_dynamic_id = 10000
 	_storm = _new_storm()
 	_storm_damage_acc = 0.0
 	_spawn_cursor = 0
@@ -305,12 +327,23 @@ func _next_match_spawn() -> Vector3:
 	_spawn_cursor += 1
 	return spawn
 
+func _random_loot_pos() -> Vector3:
+	var half := MapData.HALF_SIZE - 5.0
+	var x := randf_range(-half, half)
+	var z := randf_range(-half, half)
+	var y := 0.25
+	if randf() < 0.3:
+		y = 0.65
+	return Vector3(x, y, z)
+
 func _reset_match() -> void:
 	_phase = PHASE_WAITING
 	_phase_timer = 0.0
 	_winner_id = 0
 	_placement.clear()
 	_loot_taken.clear()
+	_dynamic_loot.clear()
+	_next_dynamic_id = 10000
 	_storm = _new_storm()
 	_storm_damage_acc = 0.0
 	_spawn_cursor = 0
@@ -461,6 +494,15 @@ func _on_auth_requested(id: int, token: String, appearance: Dictionary) -> void:
 		p["health"] = 60
 	Net.spawn_for(id, p["pos"])
 	Net.send_loot_state(id, _loot_taken.keys())
+	# Send dynamic loot spawns.
+	var dyn_spawns := []
+	for dl_id in _dynamic_loot:
+		var dl: Dictionary = _dynamic_loot[dl_id]
+		if dl.has("taken"):
+			continue
+		dyn_spawns.append({"id": dl_id, "type": dl["type"], "pos": dl["pos"]})
+	if not dyn_spawns.is_empty():
+		Net.send_dynamic_loot(id, dyn_spawns)
 	Net.send_match_state(id, _match_state_for(id))
 	print("peer %d authenticated (operator %s)" % [id, Characters.get_character(int(p["appearance"]["character"]))["name"]])
 
@@ -721,10 +763,18 @@ func _on_loot_requested(id: int, loot_id: int) -> void:
 		return
 
 	var spawn := Loot.get_spawn(loot_id)
+	var is_dynamic := false
+	if spawn.is_empty() and _dynamic_loot.has(loot_id):
+		var dl: Dictionary = _dynamic_loot[loot_id]
+		spawn = {"id": loot_id, "type": dl["type"], "pos": dl["pos"]}
+		is_dynamic = true
 	if spawn.is_empty():
 		Net.send_loot_result(id, "Unknown loot")
 		return
 	if _loot_taken.has(loot_id):
+		Net.send_loot_result(id, "Already taken")
+		return
+	if is_dynamic and _dynamic_loot.has(loot_id) and bool(_dynamic_loot[loot_id].get("taken", false)):
 		Net.send_loot_result(id, "Already taken")
 		return
 
@@ -743,6 +793,17 @@ func _on_loot_requested(id: int, loot_id: int) -> void:
 	_loot_taken[loot_id] = true
 	Net.announce_loot_taken(loot_id, id)
 	Net.send_loot_result(id, String(result["message"]))
+
+	if is_dynamic:
+		_dynamic_loot.erase(loot_id)
+	else:
+		# Schedule dynamic respawn for static loot.
+		_dynamic_loot[_next_dynamic_id] = {
+			"type": String(spawn["type"]),
+			"pos": _random_loot_pos(),
+			"respawn_at": Time.get_ticks_msec() / 1000.0 + LOOT_RESPAWN_DELAY,
+		}
+		_next_dynamic_id += 1
 
 func _on_use_item_requested(id: int, item_type: String) -> void:
 	if _phase != PHASE_LIVE:

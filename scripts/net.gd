@@ -33,6 +33,8 @@ signal player_died(victim: int, killer: int)
 signal player_respawned(pos: Vector3)
 signal loot_state(taken: Array)
 signal loot_taken(loot_id: int, by: int)
+signal loot_spawned(loot_id: int, item_type: String, pos: Vector3)
+signal loot_spawned_bulk(spawns: Array)
 signal loot_result_received(message: String)
 signal loot_reset
 signal kill_feed_received(text: String)
@@ -258,12 +260,26 @@ func send_loot_state(id: int, taken: Array) -> void:
 func apply_loot_state(taken: Array) -> void:
 	loot_state.emit(taken)
 
+func send_dynamic_loot(id: int, spawns: Array) -> void:
+	rpc_id(id, "apply_dynamic_loot", spawns)
+
+@rpc("authority", "reliable")
+func apply_dynamic_loot(spawns: Array) -> void:
+	loot_spawned_bulk.emit(spawns)
+
 func announce_loot_taken(loot_id: int, by: int) -> void:
 	rpc("apply_loot_taken", loot_id, by)
 
 @rpc("authority", "reliable")
 func apply_loot_taken(loot_id: int, by: int) -> void:
 	loot_taken.emit(loot_id, by)
+
+func announce_loot_spawned(loot_id: int, item_type: String, pos: Vector3) -> void:
+	rpc("apply_loot_spawned", loot_id, item_type, pos)
+
+@rpc("authority", "reliable")
+func apply_loot_spawned(loot_id: int, item_type: String, pos: Vector3) -> void:
+	loot_spawned.emit(loot_id, item_type, pos)
 
 func send_loot_result(id: int, message: String) -> void:
 	rpc_id(id, "apply_loot_result", message)

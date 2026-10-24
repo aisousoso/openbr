@@ -18,8 +18,24 @@ var _time := 0.0
 func _ready() -> void:
 	Net.loot_state.connect(_on_loot_state)
 	Net.loot_taken.connect(_on_loot_taken)
+	Net.loot_spawned.connect(_on_loot_spawned)
+	Net.loot_spawned_bulk.connect(_on_loot_spawned_bulk)
 	Net.loot_reset.connect(reset)
 	_build_all()
+
+func _on_loot_spawned_bulk(spawns: Array) -> void:
+	for s in spawns:
+		var loot_id := int(s["id"])
+		var item_type := String(s["type"])
+		var pos: Vector3 = s["pos"]
+		if _nodes.has(loot_id):
+			continue
+		var root := Node3D.new()
+		root.name = "Loot_%d" % loot_id
+		root.position = pos
+		add_child(root)
+		_build_visual(root, item_type)
+		_nodes[loot_id] = root
 
 func _build_all() -> void:
 	for spawn in Loot.all():
@@ -30,6 +46,17 @@ func _build_all() -> void:
 		add_child(root)
 		_build_visual(root, String(spawn["type"]))
 		_nodes[loot_id] = root
+
+func _on_loot_spawned(loot_id: int, item_type: String, pos: Vector3) -> void:
+	if _nodes.has(loot_id):
+		return
+	var root := Node3D.new()
+	root.name = "Loot_%d" % loot_id
+	root.position = pos
+	add_child(root)
+	_build_visual(root, item_type)
+	_nodes[loot_id] = root
+	_taken.erase(loot_id)
 
 func _build_visual(root: Node3D, item_type: String) -> void:
 	var item_color := Loot.color(item_type)
@@ -159,10 +186,17 @@ func set_local_player(player) -> void:
 func reset() -> void:
 	_taken.clear()
 	_nearest_id = -1
+	var to_remove := []
 	for id in _nodes.keys():
 		var node: Node3D = _nodes[id]
 		if is_instance_valid(node):
-			node.visible = true
+			if id >= 10000:
+				node.queue_free()
+				to_remove.append(id)
+			else:
+				node.visible = true
+	for id in to_remove:
+		_nodes.erase(id)
 	prompt_changed.emit("", false)
 
 func _on_loot_state(taken: Array) -> void:
