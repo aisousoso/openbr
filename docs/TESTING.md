@@ -28,6 +28,20 @@
 > الخريطة واللعب واللمس تم اختبارها على سطح المكتب فقط. لا تدّعِ دعم Android 5/6
 > عمليًا حتى تُسجّل نتيجة جهاز حقيقي أو محاكي API 21.
 
+### محاولة المحاكي على جهاز التطوير
+
+تم تنزيل Android Emulator 37.2.12 ومحاولة تشغيل صور API 21:
+
+- `arm64-v8a`: رفض المحاكي (`QEMU2 emulator does not support arm64 CPU architecture`).
+- `armeabi-v7a`: رفض المحاكي (`CPU Architecture 'arm' is not supported`).
+- `x86_64` يحتاج `Android Emulator hypervisor driver` أو WHPX، وليسا مثبتين،
+  وتثبيتهما يحتاج صلاحيات مدير وإعادة تشغيل.
+
+لذلك لا يوجد بديل عن هاتف حقيقي (أو جهاز تطوير مع WHPX مفعّل) لإتمام هذا البند.
+تم أيضًا تشغيل العميل على Windows بـ`--touch` والتقاط صورة تؤكد ظهور الـjoystick
+وأزرار `FIRE/JUMP/RELOAD/SWAP/LOOT/BAND/MED` والـHUD، لكن هذا يتحقق من الـlayout
+والمدخلات على سطح المكتب فقط، وليس من سلوك Android الفعلي.
+
 ## 2) تجهيز الهاتف
 
 1. افتح **Settings > About phone** واضغط **Build number** سبع مرات.
