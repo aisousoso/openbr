@@ -63,6 +63,7 @@ func _ready() -> void:
 	Net.loot_result_received.connect(_on_loot_result)
 	Net.match_state_received.connect(_on_match_state)
 	Net.kill_feed_received.connect(_on_kill_feed)
+	Net.emote_received.connect(_on_emote_received)
 
 	connect_screen.connect_requested.connect(_on_connect_requested)
 	connect_screen.back_requested.connect(_on_connect_back)
@@ -119,6 +120,19 @@ func _process(_delta: float) -> void:
 		_update_spectator_camera()
 
 func _unhandled_input(event: InputEvent) -> void:
+	# Emote shortcuts (keys 1-5).
+	if event is InputEventKey and event.pressed and not event.echo:
+		var emote_index := -1
+		match event.keycode:
+			KEY_1: emote_index = 0
+			KEY_2: emote_index = 1
+			KEY_3: emote_index = 2
+			KEY_4: emote_index = 3
+			KEY_5: emote_index = 4
+		if emote_index >= 0 and local_player != null and is_instance_valid(local_player):
+			Net.request_emote(emote_index)
+			return
+
 	if event.is_action_pressed("ui_cancel"):
 		# Do not steal the mouse while the connection or lobby UI is open, and
 		# the touch UI needs a visible pointer on desktop (--touch).
@@ -370,6 +384,31 @@ func _on_kill_feed(text: String) -> void:
 	hud.push_kill_feed(text)
 	if OS.is_debug_build():
 		print("Kill feed: %s" % text)
+
+func _on_emote_received(player_id: int, emote_index: int) -> void:
+	# Show a floating emote label above the player.
+	var emotes := ["👋", "👍", "😀", "👏", "💃"]
+	var emote_text := emotes[clampi(emote_index, 0, emotes.size() - 1)]
+	var target_node: Node3D = null
+	if player_id == multiplayer.get_unique_id():
+		target_node = local_player
+	elif remote_players.has(player_id):
+		target_node = remote_players[player_id]
+	if target_node == null:
+		return
+	# Create a Label3D above the player.
+	var label := Label3D.new()
+	label.text = emote_text
+	label.font_size = 64
+	label.position = Vector3(0, 2.2, 0)
+	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	target_node.add_child(label)
+	# Remove after 2 seconds.
+	var timer := get_tree().create_timer(2.0)
+	timer.timeout.connect(func() -> void:
+		if is_instance_valid(label):
+			label.queue_free()
+	)
 
 func _on_ready_pressed(ready: bool) -> void:
 	Net.send_ready(ready)

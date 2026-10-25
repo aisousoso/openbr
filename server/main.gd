@@ -128,6 +128,7 @@ func _ready() -> void:
 	Net.use_item_requested.connect(_on_use_item_requested)
 	Net.peer_disconnected.connect(_on_peer_disconnected)
 	Net.ready_requested.connect(_on_ready_requested)
+	Net.emote_requested.connect(_on_emote_requested)
 
 	var port := int(_arg("--port", "7777"))
 	var err := Net.host_game(port, MAX_PLAYERS)
@@ -394,6 +395,14 @@ func _on_ready_requested(id: int, ready: bool) -> void:
 	p["ready"] = ready
 	print("peer %d ready=%s (%d/%d)" % [id, ready, _ready_count(), _min_players])
 	_broadcast_match_state()
+
+func _on_emote_requested(id: int, emote_index: int) -> void:
+	if _phase != PHASE_LIVE:
+		return
+	var p = players.get(id)
+	if p == null or not p["alive"]:
+		return
+	Net.announce_emote(id, emote_index)
 
 func _match_state_for(id: int) -> Dictionary:
 	var p: Dictionary = players.get(id, {})

@@ -22,6 +22,8 @@ signal weapon_requested(id: int, index: int)
 signal reload_requested(id: int)
 signal loot_requested(id: int, loot_id: int)
 signal use_item_requested(id: int, item_type: String)
+signal emote_requested(id: int, emote_index: int)
+signal emote_received(player_id: int, emote_index: int)
 signal peer_disconnected(id: int)
 
 signal match_state_received(state: Dictionary)
@@ -129,6 +131,11 @@ func request_use_item(item_type: String) -> void:
 		return
 	rpc_id(1, "request_use_item_rpc", item_type)
 
+func request_emote(emote_index: int) -> void:
+	if is_server() or not is_client_connected():
+		return
+	rpc_id(1, "request_emote_rpc", emote_index)
+
 func send_ready(ready: bool) -> void:
 	if is_server() or not is_client_connected():
 		return
@@ -192,6 +199,12 @@ func request_use_item_rpc(item_type: String) -> void:
 	if not multiplayer.is_server():
 		return
 	use_item_requested.emit(multiplayer.get_remote_sender_id(), item_type)
+
+@rpc("any_peer", "reliable")
+func request_emote_rpc(emote_index: int) -> void:
+	if not multiplayer.is_server():
+		return
+	emote_requested.emit(multiplayer.get_remote_sender_id(), emote_index)
 
 @rpc("any_peer", "reliable")
 func request_ready_rpc(ready: bool) -> void:
@@ -273,6 +286,13 @@ func announce_loot_taken(loot_id: int, by: int) -> void:
 @rpc("authority", "reliable")
 func apply_loot_taken(loot_id: int, by: int) -> void:
 	loot_taken.emit(loot_id, by)
+
+func announce_emote(player_id: int, emote_index: int) -> void:
+	rpc("apply_emote", player_id, emote_index)
+
+@rpc("authority", "reliable")
+func apply_emote(player_id: int, emote_index: int) -> void:
+	emote_received.emit(player_id, emote_index)
 
 func announce_loot_spawned(loot_id: int, item_type: String, pos: Vector3) -> void:
 	rpc("apply_loot_spawned", loot_id, item_type, pos)
