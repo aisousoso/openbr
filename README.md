@@ -494,8 +494,8 @@ adb install -r build/OpenBR-release.apk
 | الملف | الحجم | SHA-256 | التوقيع / ملاحظات |
 |---|---:|---|---|
 | `build/OpenBR.apk` | 31,375,900 | `4CC26EE93F7290798D7CE9C1AB446FCA37F720203A3E0006CDCBCBE2CF6BED39` | debug، `CN=Android Debug`، ARM64، minSdk 21 |
-| `build/OpenBR-release.apk` | 29,844,039 | `B2BB51AB1DF3233ABF3C0555A1D427B849140B55184A6D392D11717287D885DD` | release، `CN=OpenBR`، APK v1/v2/v3، minSdk 21 |
-| `build/OpenBR-release.aab` | 29,765,369 | `55C4FD1AD1D6ADD00479009016462F41F155AC8BBA2CDECACA8693B3221F95D4` | release، `CN=OpenBR`، `bundletool validate` exit 0، minSdk 21 |
+| `build/OpenBR-release.apk` | 29,848,135 | `25C764C364D4EEFC64C84F375C55EA7D99EF2231329EBCB1DCB5FF669B9052C5` | release، `CN=OpenBR`، APK v1/v2/v3، minSdk 21 |
+| `build/OpenBR-release.aab` | 29,765,470 | `CB86E6C118AEA39C6BA6AFFCABB3350E27744A01756203DC5809A98D41AB6069` | release، `CN=OpenBR`، `bundletool validate` exit 0، minSdk 21 |
 
 كل المخرجات: `org.openbr.game`، الإصدار `0.2.0`، `targetSdk 34`، ARM64 فقط،
 وصلاحية `INTERNET`. الـAPK غير debuggable في نسخة release.
