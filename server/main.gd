@@ -133,6 +133,8 @@ func _ready() -> void:
 	Net.ready_requested.connect(_on_ready_requested)
 	Net.emote_requested.connect(_on_emote_requested)
 	Net.ping_requested.connect(_on_ping_requested)
+	Net.vehicle_enter_requested.connect(_on_vehicle_enter_requested)
+	Net.vehicle_exit_requested.connect(_on_vehicle_exit_requested)
 
 	var port := int(_arg("--port", "7777"))
 	var err := Net.host_game(port, MAX_PLAYERS)
@@ -461,6 +463,24 @@ func _on_ping_requested(id: int, pos: Vector3) -> void:
 		return
 	Net.announce_ping(id, pos)
 
+func _on_vehicle_enter_requested(id: int, vehicle_id: int) -> void:
+	if _phase != PHASE_LIVE:
+		return
+	var p = players.get(id)
+	if p == null or not p["alive"]:
+		return
+	# Mark player as in vehicle (disable movement).
+	p["in_vehicle"] = vehicle_id
+	p["input_dir"] = Vector2.ZERO
+
+func _on_vehicle_exit_requested(id: int, vehicle_id: int) -> void:
+	if _phase != PHASE_LIVE:
+		return
+	var p = players.get(id)
+	if p == null or not p["alive"]:
+		return
+	p["in_vehicle"] = 0
+
 func _match_state_for(id: int) -> Dictionary:
 	var p: Dictionary = players.get(id, {})
 	return {
@@ -611,6 +631,7 @@ func _create_player(id: int, is_bot: bool, weapon_index := DEFAULT_WEAPON, appea
 		"bot": is_bot,
 		"ready": is_bot,
 		"team_id": 0,
+		"in_vehicle": 0,
 		"appearance": appearance_data,
 	}
 	p.merge(Inventory.new_state())

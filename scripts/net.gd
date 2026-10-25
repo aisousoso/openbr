@@ -22,6 +22,8 @@ signal weapon_requested(id: int, index: int)
 signal reload_requested(id: int)
 signal loot_requested(id: int, loot_id: int)
 signal use_item_requested(id: int, item_type: String)
+signal vehicle_enter_requested(id: int, vehicle_id: int)
+signal vehicle_exit_requested(id: int, vehicle_id: int)
 signal emote_requested(id: int, emote_index: int)
 signal ping_requested(id: int, pos: Vector3)
 signal emote_received(player_id: int, emote_index: int)
@@ -133,6 +135,16 @@ func request_use_item(item_type: String) -> void:
 		return
 	rpc_id(1, "request_use_item_rpc", item_type)
 
+func request_vehicle_enter(vehicle_id: int) -> void:
+	if is_server() or not is_client_connected():
+		return
+	rpc_id(1, "request_vehicle_enter_rpc", vehicle_id)
+
+func request_vehicle_exit(vehicle_id: int) -> void:
+	if is_server() or not is_client_connected():
+		return
+	rpc_id(1, "request_vehicle_exit_rpc", vehicle_id)
+
 func request_emote(emote_index: int) -> void:
 	if is_server() or not is_client_connected():
 		return
@@ -206,6 +218,18 @@ func request_use_item_rpc(item_type: String) -> void:
 	if not multiplayer.is_server():
 		return
 	use_item_requested.emit(multiplayer.get_remote_sender_id(), item_type)
+
+@rpc("any_peer", "reliable")
+func request_vehicle_enter_rpc(vehicle_id: int) -> void:
+	if not multiplayer.is_server():
+		return
+	vehicle_enter_requested.emit(multiplayer.get_remote_sender_id(), vehicle_id)
+
+@rpc("any_peer", "reliable")
+func request_vehicle_exit_rpc(vehicle_id: int) -> void:
+	if not multiplayer.is_server():
+		return
+	vehicle_exit_requested.emit(multiplayer.get_remote_sender_id(), vehicle_id)
 
 @rpc("any_peer", "reliable")
 func request_emote_rpc(emote_index: int) -> void:
