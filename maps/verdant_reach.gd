@@ -8,6 +8,7 @@ extends Node3D
 ## visuals always match.
 
 const MapData := preload("res://shared/map_data.gd")
+const MultiMeshHelper := preload("res://maps/multimesh_helper.gd")
 
 const WOOD := Color(0.30, 0.20, 0.12)
 const DARK_WOOD := Color(0.18, 0.12, 0.08)
@@ -449,14 +450,12 @@ func _build_sunken_gardens() -> void:
 
 func _build_scatter() -> void:
 	# Mid-map cover and waystations break up the open lanes.
-	_sphere("Scatter_RockA", Vector3(16, 0.8, 22), 1.7, STONE, true)
-	_sphere("Scatter_RockB", Vector3(-22, 0.8, 18), 1.8, STONE, true)
-	_sphere("Scatter_RockC", Vector3(22, 0.7, -18), 1.6, STONE, true)
-	_sphere("Scatter_RockD", Vector3(-18, 0.7, -22), 1.5, STONE, true)
-	_sphere("Scatter_BushA", Vector3(10, 0.5, 14), 0.9, Color(0.18, 0.42, 0.20), false)
-	_sphere("Scatter_BushB", Vector3(-12, 0.5, 14), 0.9, Color(0.18, 0.42, 0.20), false)
-	_sphere("Scatter_BushC", Vector3(14, 0.5, -12), 0.9, Color(0.18, 0.42, 0.20), false)
-	_sphere("Scatter_BushD", Vector3(-14, 0.5, -12), 0.9, Color(0.18, 0.42, 0.20), false)
+	# MultiMesh instancing for rocks and bushes (reduce draw calls).
+	var rock_positions: Array[Vector3] = [Vector3(16, 0.8, 22), Vector3(-22, 0.8, 18), Vector3(22, 0.7, -18), Vector3(-18, 0.7, -22)]
+	var rock_mm := MultiMeshHelper.create_sphere_multimesh(self, "Scatter_Rocks", 1.7, STONE, rock_positions, true)
+
+	var bush_positions: Array[Vector3] = [Vector3(10, 0.5, 14), Vector3(-12, 0.5, 14), Vector3(14, 0.5, -12), Vector3(-14, 0.5, -12)]
+	var bush_mm := MultiMeshHelper.create_sphere_multimesh(self, "Scatter_Bushes", 0.9, Color(0.18, 0.42, 0.20), bush_positions, false)
 
 	for lamp in [Vector3(0, 0, 24), Vector3(0, 0, -24), Vector3(24, 0, 0), Vector3(-24, 0, 0)]:
 		_box("Scatter_LampPost", Vector3(lamp.x, 2.0, lamp.z), Vector3(0.18, 4.0, 0.18), DARK_METAL)
