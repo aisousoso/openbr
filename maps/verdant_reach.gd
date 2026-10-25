@@ -40,6 +40,7 @@ func _ready() -> void:
 	_build_sunken_gardens()
 	_build_scatter()
 	print("map: %s built (%d spawn markers)" % [MapData.NAME, $SpawnPoints.get_child_count()])
+	_add_occluders()
 
 # ---------------------------------------------------------------- primitives
 
@@ -460,3 +461,20 @@ func _build_scatter() -> void:
 	for lamp in [Vector3(0, 0, 24), Vector3(0, 0, -24), Vector3(24, 0, 0), Vector3(-24, 0, 0)]:
 		_box("Scatter_LampPost", Vector3(lamp.x, 2.0, lamp.z), Vector3(0.18, 4.0, 0.18), DARK_METAL)
 		_sphere("Scatter_Lamp", Vector3(lamp.x, 4.1, lamp.z), 0.28, Color(1.0, 0.82, 0.45), false, null, Color(1.0, 0.55, 0.15))
+
+func _add_occluders() -> void:
+	# Box occluders for major structures (bake in editor: Project -> Bake Occlusion).
+	var occluders := [
+		{"pos": Vector3(0, 2, 0), "size": Vector3(12, 4, 12)},       # Meridian Relay
+		{"pos": Vector3(30, 2, 30), "size": Vector3(10, 4, 10)},     # Aurora Yards
+		{"pos": Vector3(-30, 2, -30), "size": Vector3(10, 4, 10)},  # Cinder Terrace
+		{"pos": Vector3(0, 2, 35), "size": Vector3(8, 4, 8)},        # Tideglass Shore
+		{"pos": Vector3(0, 2, -35), "size": Vector3(8, 4, 8)},       # Dune Chapel
+	]
+	for o in occluders:
+		var occ := OccluderInstance3D.new()
+		var box := BoxOccluder3D.new()
+		box.size = o["size"]
+		occ.occluder = box
+		occ.position = o["pos"]
+		add_child(occ)
