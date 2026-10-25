@@ -24,6 +24,7 @@ const Characters := preload("res://shared/characters.gd")
 const Loot := preload("res://shared/loot.gd")
 const Inventory := preload("res://shared/inventory.gd")
 const MapData := preload("res://shared/map_data.gd")
+const BattlePass := preload("res://shared/battle_pass.gd")
 const Auth := preload("res://server/auth.gd")
 const ARENA := preload("res://maps/verdant_reach.tscn")
 
@@ -79,6 +80,7 @@ var _squad_size := 1
 var _loot_taken := {}
 var _dynamic_loot := {}  # id -> {type, pos, respawn_at}
 var _next_dynamic_id := 10000
+var _player_xp := {}  # player_id -> total xp
 const LOOT_RESPAWN_DELAY := 30.0
 var _test_loot := false
 
@@ -433,9 +435,27 @@ func _check_match_end() -> void:
 
 	_phase = PHASE_ENDED
 	_phase_timer = _end_delay
+
+	# Award Battle Pass XP.
+	_award_battle_pass_xp()
+
 	_broadcast_match_state()
 	if _end_delay <= 0.0:
 		_reset_match()
+
+func _award_battle_pass_xp() -> void:
+	for id in players:
+		var p: Dictionary = players[id]
+		if p.get("bot", false):
+			continue
+		var kills := int(p.get("kills", 0))
+		var placement := int(_placement.get(id, players.size()))
+		var survived := _phase_timer  # approximate
+		var xp := BattlePass.xp_for_match(kills, placement, survived)
+		var current := int(_player_xp.get(id, 0))
+		_player_xp[id] = current + xp
+		print("Battle Pass: peer %d earned %d XP (total %d, tier %d)" % [id, xp, _player_xp[id], BattlePass.tier_for_xp(_player_xp[id])])
+		Net.send_battle_pass_update(id, _player_xp[id])
 
 func _on_ready_requested(id: int, ready: bool) -> void:
 	var p = players.get(id)

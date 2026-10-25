@@ -1,5 +1,7 @@
 extends Node
 
+const BattlePass := preload("res://shared/battle_pass.gd")
+
 ## Networking facade shared by client and server.
 ## Every RPC lives here, so both sides agree on node paths (/root/Net).
 ##
@@ -43,6 +45,7 @@ signal loot_spawned(loot_id: int, item_type: String, pos: Vector3)
 signal loot_spawned_bulk(spawns: Array)
 signal loot_result_received(message: String)
 signal loot_reset
+signal battle_pass_updated(xp: int, tier: int)
 signal kill_feed_received(text: String)
 
 const SEND_HZ := 30.0
@@ -358,6 +361,13 @@ func send_loot_reset(id: int) -> void:
 @rpc("authority", "reliable")
 func apply_loot_reset() -> void:
 	loot_reset.emit()
+
+func send_battle_pass_update(id: int, xp: int) -> void:
+	rpc_id(id, "apply_battle_pass_update", xp)
+
+@rpc("authority", "reliable")
+func apply_battle_pass_update(xp: int) -> void:
+	battle_pass_updated.emit(xp, BattlePass.tier_for_xp(xp))
 
 func announce_kill_feed(text: String) -> void:
 	rpc("apply_kill_feed", text)
