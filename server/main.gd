@@ -907,6 +907,20 @@ func _resolve_shot(id: int, dir: Vector3, weapon_index: int) -> void:
 		var end := origin + pellet_dir * hit_t
 		if hit_id != 0:
 			_apply_damage(hit_id, id, now, int(weapon["damage"]))
+		# Explosive: area damage.
+		if bool(weapon.get("explosive", false)):
+			var blast := float(weapon.get("blast_radius", 5.0))
+			for other_id in players:
+				if other_id == id:
+					continue
+				var target: Dictionary = players[other_id]
+				if not target["alive"]:
+					continue
+				var center: Vector3 = target["pos"] + Vector3(0, BODY_CENTER, 0)
+				var dist := center.distance_to(end)
+				if dist <= blast:
+					var falloff := 1.0 - (dist / blast)
+					_apply_damage(other_id, id, now, int(float(weapon["damage"]) * falloff * 0.5))
 		_send_shot_events(id, origin, end, hit_id, weapon_index)
 
 func _send_shot_events(shooter_id: int, from: Vector3, to: Vector3, hit: int, weapon_index: int) -> void:
