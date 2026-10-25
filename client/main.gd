@@ -195,8 +195,11 @@ func _on_connected() -> void:
 
 func _on_connection_failed() -> void:
 	_connecting = false
-	print("Connection failed: no response from server (check host, port, firewall)")
-	connect_screen.open_screen("Could not connect. Check host, port and firewall.")
+	var detail: String = Net.last_connect_error
+	if detail.is_empty():
+		detail = "no response from server (check host, port, firewall)"
+	print("Connection failed: %s" % detail)
+	connect_screen.open_screen("Could not connect: %s" % detail)
 
 func _on_rejected(reason: String) -> void:
 	_reject_reason = reason

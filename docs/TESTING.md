@@ -10,8 +10,8 @@
 | البند | الحالة | الدليل |
 |---|---|---|
 | بناء debug APK | ✅ تم | `build/OpenBR.apk` 27,282,162 بايت، توقيع `CN=Godot`، `apksigner verify` exit 0 |
-| بناء release APK | ✅ تم | `build/OpenBR-release.apk` 25,750,301 بايت، توقيع `CN=OpenBR`، `apksigner verify` exit 0 |
-| بناء release AAB | ✅ تم | `build/OpenBR-release.aab` 25,687,671 بايت، `bundletool validate` exit 0 |
+| بناء release APK | ✅ تم | `build/OpenBR-release.apk` 25,754,397 بايت، توقيع `CN=OpenBR`، `apksigner verify` exit 0 |
+| بناء release AAB | ✅ تم | `build/OpenBR-release.aab` 25,688,114 بايت، `bundletool validate` exit 0 |
 | `org.openbr.game` + `targetSdk 34` + ARM64 + `INTERNET` | ✅ تم | `aapt dump badging` + `bundletool dump manifest` |
 | minSdk للـAPK | ✅ 21 | `aapt dump badging` |
 | minSdk للـAAB | ✅ 21 | `bundletool dump manifest` |
@@ -27,7 +27,8 @@
 | اتصال العميل بالسيرفر على محاكي MEmu | ✅ تم | `Connected to server, authenticating ...` ثم `peer ... authenticated` على `192.168.1.7:7777` |
 | دورة READY → COUNTDOWN → LIVE على MEmu | ✅ تم | `ready=true (1/1)`، `match 1 LIVE (1 players, 1 humans)`، بلا أخطاء RPC |
 | لوحة اللمس على MEmu | ✅ تم | JOY/FIRE/JUMP/RELOAD/SWAP/LOOT/BAND/MED + **PING/EMOTE** (أُضيفا) |
-| فشل الاتصال (منفذ مغلق أو عنوان خاطئ) | ✅ تم | `Connection failed ...` بعد ~8s بدل ~32s |
+| فشل الاتصال (منفذ مغلق) | ✅ تم | `no response after 8s (host, port or firewall)` بدل انتظار ~32s |
+| فشل الاتصال (عنوان/DNS خاطئ) | ✅ تم | `could not reach no-such-host.invalid:7801 (check the address)` |
 | رفض توكن غير صالح | ✅ تم | `rejected (invalid token)` على السيرفر بلا أخطاء محرك |
 | **لمس فعلي على هاتف** | ⛔ لم يُختبر | لا يوجد جهاز متصل؛ تم التحقق على محاكي MEmu فقط |
 | **لعب LAN من الهاتف** | ⛔ لم يُختبر | يحتاج هاتفًا على نفس شبكة الـPC (MEmu يمرّ عبر loopback فلا يكفي) |

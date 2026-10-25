@@ -41,7 +41,9 @@ All notable changes to OpenBR are documented here.
 - `hit_effect.gd` now parents sparks before `look_at` and uses `global_position`.
 - `Net.reject()` no longer calls `get_peer()` on a peer that already left (engine error spam).
 - Client now reports an unreachable server after 8s instead of waiting ~32s for the ENet timeout.
+- Connect failures now name the cause (`could not reach host:port` vs `no response after 8s`).
 - Touch UI gained **PING** and **EMOTE** buttons; both systems were unreachable on Android before.
+- Export presets exclude `build/` so dev screenshots are no longer packed into APK/AAB.
 
 ## [0.2.0] - 2026-10-24
 

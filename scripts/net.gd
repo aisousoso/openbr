@@ -61,16 +61,22 @@ var _jump := false
 var _appearance: Dictionary = {}
 var _join_token := ""
 var _connect_deadline := 0.0
+## Human-readable reason for the last connection_failed, so the UI can tell a
+## DNS/address mistake apart from a silent (firewall) timeout.
+var last_connect_error := ""
 
 func _ready() -> void:
 	multiplayer.connected_to_server.connect(func() -> void:
 		_connect_deadline = 0.0
+		last_connect_error = ""
 		connected.emit()
 		if not _join_token.is_empty() and is_client_connected():
 			rpc_id(1, "authenticate", _join_token, _appearance)
 	)
 	multiplayer.connection_failed.connect(func() -> void:
 		_connect_deadline = 0.0
+		if last_connect_error.is_empty():
+			last_connect_error = "server refused the connection"
 		connection_failed.emit()
 		_shutdown.call_deferred()
 	)
@@ -90,6 +96,7 @@ func _process(_delta: float) -> void:
 		return
 	_connect_deadline = 0.0
 	push_warning("connect timed out after %.0fs" % CONNECT_TIMEOUT)
+	last_connect_error = "no response after %.0fs (host, port or firewall)" % CONNECT_TIMEOUT
 	connection_failed.emit()
 	_shutdown.call_deferred()
 
@@ -123,6 +130,7 @@ func join_game(host: String, port: int, token: String, appearance: Dictionary = 
 		push_error("connect failed: %s" % error_string(err))
 		_join_token = ""
 		_connect_deadline = 0.0
+		last_connect_error = "could not reach %s:%d (check the address)" % [host, port]
 		connection_failed.emit()
 		return
 	multiplayer.multiplayer_peer = _peer
