@@ -66,6 +66,9 @@ func _box(node_name: String, pos: Vector3, size: Vector3, color: Color, rot := V
 	box_mesh.size = size
 	mesh_instance.mesh = box_mesh
 	mesh_instance.material_override = _mat(color, emission)
+mesh_instance.visibility_range_begin = 0.0
+mesh_instance.visibility_range_end = 80.0
+mesh_instance.visibility_range_end_margin = 10.0
 
 	if not collision:
 		mesh_instance.position = pos
@@ -100,6 +103,9 @@ func _cylinder(node_name: String, pos: Vector3, radius: float, height: float, co
 	cylinder_mesh.rings = 1
 	mesh_instance.mesh = cylinder_mesh
 	mesh_instance.material_override = _mat(color, emission)
+mesh_instance.visibility_range_begin = 0.0
+mesh_instance.visibility_range_end = 80.0
+mesh_instance.visibility_range_end_margin = 10.0
 
 	if not collision:
 		mesh_instance.position = pos
@@ -134,6 +140,9 @@ func _sphere(node_name: String, pos: Vector3, radius: float, color: Color, colli
 	sphere_mesh.rings = 4
 	mesh_instance.mesh = sphere_mesh
 	mesh_instance.material_override = _mat(color, emission)
+mesh_instance.visibility_range_begin = 0.0
+mesh_instance.visibility_range_end = 80.0
+mesh_instance.visibility_range_end_margin = 10.0
 
 	if not collision:
 		mesh_instance.position = pos
@@ -165,6 +174,9 @@ func _cone(node_name: String, pos: Vector3, radius: float, height: float, color:
 	cone_mesh.rings = 1
 	mesh_instance.mesh = cone_mesh
 	mesh_instance.material_override = _mat(color)
+	mesh_instance.visibility_range_begin = 0.0
+	mesh_instance.visibility_range_end = 80.0
+	mesh_instance.visibility_range_end_margin = 10.0
 	mesh_instance.position = pos
 	_props.add_child(mesh_instance)
 

@@ -152,6 +152,10 @@ func _add_box(parent: Node3D, node_name: String, size: Vector3, pos: Vector3, co
 	instance.mesh = mesh
 	instance.position = pos
 	instance.material_override = _material(color)
+	# LOD: fade out distant parts.
+	instance.visibility_range_begin = 0.0
+	instance.visibility_range_end = 50.0
+	instance.visibility_range_end_margin = 5.0
 	parent.add_child(instance)
 	return instance
 
@@ -166,6 +170,10 @@ func _add_sphere(parent: Node3D, node_name: String, radius: float, pos: Vector3,
 	instance.mesh = mesh
 	instance.position = pos
 	instance.material_override = _material(color)
+	# LOD: fade out distant parts.
+	instance.visibility_range_begin = 0.0
+	instance.visibility_range_end = 50.0
+	instance.visibility_range_end_margin = 5.0
 	parent.add_child(instance)
 	return instance
 
@@ -181,6 +189,10 @@ func _add_hemisphere(parent: Node3D, node_name: String, radius: float, pos: Vect
 	instance.mesh = mesh
 	instance.position = pos
 	instance.material_override = _material(color)
+	# LOD: fade out distant parts.
+	instance.visibility_range_begin = 0.0
+	instance.visibility_range_end = 50.0
+	instance.visibility_range_end_margin = 5.0
 	parent.add_child(instance)
 	return instance
 
@@ -196,6 +208,10 @@ func _add_cylinder(parent: Node3D, node_name: String, top_radius: float, bottom_
 	instance.mesh = mesh
 	instance.position = pos
 	instance.material_override = _material(color)
+	# LOD: fade out distant parts.
+	instance.visibility_range_begin = 0.0
+	instance.visibility_range_end = 50.0
+	instance.visibility_range_end_margin = 5.0
 	parent.add_child(instance)
 	return instance
 
@@ -211,6 +227,10 @@ func _add_torus(parent: Node3D, node_name: String, inner_radius: float, outer_ra
 	instance.position = pos
 	instance.scale = Vector3(1.0, maxf(0.8, height * 6.0), 1.0)
 	instance.material_override = _material(color)
+	# LOD: fade out distant parts.
+	instance.visibility_range_begin = 0.0
+	instance.visibility_range_end = 50.0
+	instance.visibility_range_end_margin = 5.0
 	parent.add_child(instance)
 	return instance
 

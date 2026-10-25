@@ -171,9 +171,17 @@ func _physics_process(delta: float) -> void:
 				continue
 
 			var body: CharacterBody3D = p["body"]
+			var old_pos: Vector3 = p["pos"]
 			Movement.step_body(body, p["input_dir"], p["yaw"], p["jump"], delta)
 			p["jump"] = false
 			p["pos"] = body.global_position
+			# Anti-cheat: clamp excessive movement speed.
+			var moved := old_pos.distance_to(p["pos"])
+			var max_move := 15.0 * delta  # 15 m/s max
+			if moved > max_move and not p.get("bot", false):
+				var dir := (p["pos"] - old_pos).normalized()
+				p["pos"] = old_pos + dir * max_move
+				body.global_position = p["pos"]
 			_update_cell(id, p)
 
 		# Resolve queued shots inside the physics tick so space-state queries are safe.
