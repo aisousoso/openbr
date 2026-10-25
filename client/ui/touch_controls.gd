@@ -16,6 +16,8 @@ signal weapon_cycle
 signal loot
 signal use_bandage
 signal use_medkit
+signal ping
+signal emote
 
 const JOY_RADIUS := 110.0
 const JOY_MARGIN := 150.0
@@ -26,6 +28,8 @@ const SWAP_RADIUS := 40.0
 const LOOT_RADIUS := 48.0
 const BAND_RADIUS := 36.0
 const MED_RADIUS := 36.0
+const PING_RADIUS := 40.0
+const EMOTE_RADIUS := 40.0
 
 var _enabled := false
 var _force_touch := false
@@ -38,6 +42,8 @@ var _swap_index := -1
 var _loot_index := -1
 var _band_index := -1
 var _med_index := -1
+var _ping_index := -1
+var _emote_index := -1
 var _joy_active := false
 var _joy_center := Vector2.ZERO
 var _joy_vec := Vector2.ZERO
@@ -76,6 +82,8 @@ func reset() -> void:
 	_loot_index = -1
 	_band_index = -1
 	_med_index = -1
+	_ping_index = -1
+	_emote_index = -1
 	_joy_active = false
 	_joy_vec = Vector2.ZERO
 	_joy_center = _default_joy_center()
@@ -168,6 +176,18 @@ func _on_down(index: int, pos: Vector2) -> void:
 		queue_redraw()
 		return
 
+	if pos.distance_to(_ping_center()) <= PING_RADIUS * 1.3:
+		_ping_index = index
+		ping.emit()
+		queue_redraw()
+		return
+
+	if pos.distance_to(_emote_center()) <= EMOTE_RADIUS * 1.3:
+		_emote_index = index
+		emote.emit()
+		queue_redraw()
+		return
+
 	if _look_index == -1:
 		_look_index = index
 
@@ -211,6 +231,12 @@ func _on_up(index: int) -> void:
 		queue_redraw()
 	elif index == _med_index:
 		_med_index = -1
+		queue_redraw()
+	elif index == _ping_index:
+		_ping_index = -1
+		queue_redraw()
+	elif index == _emote_index:
+		_emote_index = -1
 		queue_redraw()
 
 func _release_move() -> void:
@@ -259,6 +285,14 @@ func _band_center() -> Vector2:
 func _med_center() -> Vector2:
 	var screen := get_viewport_rect().size
 	return Vector2(screen.x - 250.0, screen.y - 430.0)
+
+func _ping_center() -> Vector2:
+	var screen := get_viewport_rect().size
+	return Vector2(screen.x - 90.0, 80.0)
+
+func _emote_center() -> Vector2:
+	var screen := get_viewport_rect().size
+	return Vector2(screen.x - 200.0, 80.0)
 
 func _has_arg(prefix: String) -> bool:
 	for a in OS.get_cmdline_args():
@@ -314,6 +348,16 @@ func _draw() -> void:
 	draw_circle(mc, MED_RADIUS, Color(0.95, 0.3, 0.3, 0.42))
 	draw_arc(mc, MED_RADIUS, 0.0, TAU, 32, Color(1, 1, 1, 0.4), 2.0, true)
 	_draw_label(mc, "MED")
+
+	var pc := _ping_center()
+	draw_circle(pc, PING_RADIUS, Color(0.35, 0.85, 0.95, 0.4))
+	draw_arc(pc, PING_RADIUS, 0.0, TAU, 32, Color(1, 1, 1, 0.4), 2.0, true)
+	_draw_label(pc, "PING")
+
+	var ec := _emote_center()
+	draw_circle(ec, EMOTE_RADIUS, Color(0.75, 0.6, 0.95, 0.4))
+	draw_arc(ec, EMOTE_RADIUS, 0.0, TAU, 32, Color(1, 1, 1, 0.4), 2.0, true)
+	_draw_label(ec, "EMOTE")
 
 func _draw_label(center: Vector2, text: String) -> void:
 	var font := ThemeDB.fallback_font

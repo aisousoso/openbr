@@ -33,6 +33,7 @@ var _combat_test_started := false
 var _loot_test_started := false
 var _ready_test_started := false
 var _appearance: Dictionary = {}
+var _emote_cursor := 0
 
 var _match_state: Dictionary = {}
 var _last_phase := ""
@@ -75,6 +76,8 @@ func _ready() -> void:
 	touch.loot.connect(_on_touch_loot)
 	touch.use_bandage.connect(_on_touch_use_bandage)
 	touch.use_medkit.connect(_on_touch_use_medkit)
+	touch.ping.connect(_on_touch_ping)
+	touch.emote.connect(_on_touch_emote)
 	match_panel.ready_pressed.connect(_on_ready_pressed)
 	match_panel.leave_pressed.connect(_on_leave_pressed)
 	match_panel.spectate_next_pressed.connect(_on_spectate_next)
@@ -143,18 +146,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if (event is InputEventKey and event.pressed and event.keycode == KEY_P) or \
 	   (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_MIDDLE):
 		if local_player != null and is_instance_valid(local_player):
-			var cam: Camera3D = local_player.get_node_or_null("Head/Camera3D")
-			if cam != null:
-				var from := cam.global_position
-				var to := from + (-cam.global_transform.basis.z) * 50.0
-				var space := get_world_3d().direct_space_state
-				var hit_pos := to
-				if space != null:
-					var query := PhysicsRayQueryParameters3D.create(from, to, 1)
-					var result := space.intersect_ray(query)
-					if not result.is_empty():
-						hit_pos = result["position"]
-				Net.request_ping(hit_pos)
+			_ping_at_aim()
 			return
 
 	if event.is_action_pressed("ui_cancel"):
@@ -199,9 +191,11 @@ func _start_connect(host: String, port: int, token: String) -> void:
 
 func _on_connected() -> void:
 	connect_screen.set_status("Connected. Authenticating...")
+	print("Connected to server, authenticating ...")
 
 func _on_connection_failed() -> void:
 	_connecting = false
+	print("Connection failed: no response from server (check host, port, firewall)")
 	connect_screen.open_screen("Could not connect. Check host, port and firewall.")
 
 func _on_rejected(reason: String) -> void:
@@ -776,6 +770,33 @@ func _on_touch_use_bandage() -> void:
 func _on_touch_use_medkit() -> void:
 	if local_player != null:
 		local_player.request_use_item("medkit")
+
+func _on_touch_ping() -> void:
+	# Touch equivalent of the P key: ping whatever the camera is aiming at.
+	if local_player != null and is_instance_valid(local_player):
+		_ping_at_aim()
+
+func _on_touch_emote() -> void:
+	# Touch equivalent of keys 1-5: cycle through the emotes.
+	if local_player == null or not is_instance_valid(local_player):
+		return
+	_emote_cursor = (_emote_cursor + 1) % 5
+	Net.request_emote(_emote_cursor)
+
+func _ping_at_aim() -> void:
+	var cam: Camera3D = local_player.get_node_or_null("Head/Camera3D")
+	if cam == null:
+		return
+	var from := cam.global_position
+	var to := from + (-cam.global_transform.basis.z) * 50.0
+	var space := get_world_3d().direct_space_state
+	var hit_pos := to
+	if space != null:
+		var query := PhysicsRayQueryParameters3D.create(from, to, 1)
+		var result := space.intersect_ray(query)
+		if not result.is_empty():
+			hit_pos = result["position"]
+	Net.request_ping(hit_pos)
 
 func _spawn_tracer(from: Vector3, to: Vector3, weapon := 0) -> void:
 	var mesh := ImmediateMesh.new()

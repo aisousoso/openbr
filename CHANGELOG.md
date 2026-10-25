@@ -36,6 +36,12 @@ All notable changes to OpenBR are documented here.
 
 ### Fixed
 - Lobby header profile label autowrap on 720p screens.
+- Ping/emote RPCs serialized `Vector3` as 3 floats (Godot RPC), fixing `Method expected 1 arguments`.
+- Emote list typed as `Array[String]` so `emote_text` infers `String`.
+- `hit_effect.gd` now parents sparks before `look_at` and uses `global_position`.
+- `Net.reject()` no longer calls `get_peer()` on a peer that already left (engine error spam).
+- Client now reports an unreachable server after 8s instead of waiting ~32s for the ENet timeout.
+- Touch UI gained **PING** and **EMOTE** buttons; both systems were unreachable on Android before.
 
 ## [0.2.0] - 2026-10-24
 

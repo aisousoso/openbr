@@ -5,7 +5,7 @@
 
 ## 1) الحالة الحالية
 
-آخر تحديث: 2026-10-24.
+آخر تحديث: 2026-10-25.
 
 | البند | الحالة | الدليل |
 |---|---|---|
@@ -24,12 +24,17 @@
 | دورة المباراة | ✅ headless | `WAITING → COUNTDOWN → LIVE → ENDED`، placement 4، فائز `Mako` |
 | READY + رفض الانضمام المتأخر | ✅ headless | `ready=true (3/2)`، `rejected (match in progress, phase=LIVE)` |
 | spectator + kill feed | ✅ headless | `Spectating: Lumen`، `Mako WINS THE MATCH` |
-| **لمس فعلي على هاتف** | ⛔ لم يُختبر | لا يوجد جهاز متصل؛ `adb devices -l` فارغ |
-| **لعب LAN من الهاتف** | ⛔ لم يُختبر | يحتاج هاتفًا على نفس شبكة الـPC |
+| اتصال العميل بالسيرفر على محاكي MEmu | ✅ تم | `Connected to server, authenticating ...` ثم `peer ... authenticated` على `192.168.1.7:7777` |
+| دورة READY → COUNTDOWN → LIVE على MEmu | ✅ تم | `ready=true (1/1)`، `match 1 LIVE (1 players, 1 humans)`، بلا أخطاء RPC |
+| لوحة اللمس على MEmu | ✅ تم | JOY/FIRE/JUMP/RELOAD/SWAP/LOOT/BAND/MED + **PING/EMOTE** (أُضيفا) |
+| فشل الاتصال (منفذ مغلق أو عنوان خاطئ) | ✅ تم | `Connection failed ...` بعد ~8s بدل ~32s |
+| رفض توكن غير صالح | ✅ تم | `rejected (invalid token)` على السيرفر بلا أخطاء محرك |
+| **لمس فعلي على هاتف** | ⛔ لم يُختبر | لا يوجد جهاز متصل؛ تم التحقق على محاكي MEmu فقط |
+| **لعب LAN من الهاتف** | ⛔ لم يُختبر | يحتاج هاتفًا على نفس شبكة الـPC (MEmu يمرّ عبر loopback فلا يكفي) |
 | **تثبيت AAB على Android 5/6** | ⛔ لم يُختبر | يحتاج جهاز/محاكي API 21–23 |
 
-> الخريطة واللعب واللمس تم اختبارها على سطح المكتب فقط. لا تدّعِ دعم Android 5/6
-> عمليًا حتى تُسجّل نتيجة جهاز حقيقي أو محاكي API 21.
+> الخريطة واللعب واللمس تم اختبارها على سطح المكتب وعلى محاكي MEmu (Android 9، Adreno 640).
+> لا تدّعِ دعم Android 5/6 أو هاتف حقيقي حتى تُسجّل نتيجة جهاز فعلي.
 
 ### محاولة المحاكي على جهاز التطوير
 

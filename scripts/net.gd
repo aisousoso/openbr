@@ -49,18 +49,28 @@ signal battle_pass_updated(xp: int, tier: int)
 signal kill_feed_received(text: String)
 
 const SEND_HZ := 30.0
+## ENet only reports a dead connection after ~32s, which feels like a hang.
+## Fail fast so the connect screen can show a useful message.
+const CONNECT_TIMEOUT := 8.0
 
 var _peer: ENetMultiplayerPeer
 var _acc := 0.0
 var _dir := Vector2.ZERO
 var _yaw := 0.0
 var _jump := false
-var _join_gen := 0
 var _appearance: Dictionary = {}
+var _join_token := ""
+var _connect_deadline := 0.0
 
 func _ready() -> void:
-	multiplayer.connected_to_server.connect(func() -> void: connected.emit())
+	multiplayer.connected_to_server.connect(func() -> void:
+		_connect_deadline = 0.0
+		connected.emit()
+		if not _join_token.is_empty() and is_client_connected():
+			rpc_id(1, "authenticate", _join_token, _appearance)
+	)
 	multiplayer.connection_failed.connect(func() -> void:
+		_connect_deadline = 0.0
 		connection_failed.emit()
 		_shutdown.call_deferred()
 	)
@@ -70,8 +80,22 @@ func _ready() -> void:
 	)
 	multiplayer.peer_disconnected.connect(func(id: int) -> void: peer_disconnected.emit(id))
 
+func _process(_delta: float) -> void:
+	if _connect_deadline <= 0.0:
+		return
+	if is_client_connected():
+		_connect_deadline = 0.0
+		return
+	if Time.get_ticks_msec() < _connect_deadline:
+		return
+	_connect_deadline = 0.0
+	push_warning("connect timed out after %.0fs" % CONNECT_TIMEOUT)
+	connection_failed.emit()
+	_shutdown.call_deferred()
+
 func _shutdown() -> void:
-	_join_gen += 1
+	_connect_deadline = 0.0
+	_join_token = ""
 	if multiplayer.multiplayer_peer != null:
 		multiplayer.multiplayer_peer.close()
 	multiplayer.multiplayer_peer = null
@@ -91,22 +115,19 @@ func host_game(port: int, max_clients: int) -> Error:
 	return err
 
 func join_game(host: String, port: int, token: String, appearance: Dictionary = {}) -> void:
-	_join_gen += 1
-	var gen := _join_gen
 	_appearance = appearance.duplicate(true)
+	_join_token = token
 	_peer = ENetMultiplayerPeer.new()
 	var err := _peer.create_client(host, port)
 	if err != OK:
 		push_error("connect failed: %s" % error_string(err))
+		_join_token = ""
+		_connect_deadline = 0.0
 		connection_failed.emit()
 		return
 	multiplayer.multiplayer_peer = _peer
-	await multiplayer.connected_to_server
-	# A failed attempt can leave this await pending; ignore it if a newer
-	# connect/shutdown happened in the meantime.
-	if gen != _join_gen or not is_client_connected():
-		return
-	rpc_id(1, "authenticate", token, _appearance)
+	# Authentication is sent from the connected_to_server handler in _ready().
+	_connect_deadline = Time.get_ticks_msec() + int(CONNECT_TIMEOUT * 1000.0)
 
 func queue_input(dir: Vector2, yaw: float, jump: bool) -> void:
 	_dir = dir
@@ -381,10 +402,15 @@ func apply_kill_feed(text: String) -> void:
 func reject(id: int, reason := "authentication failed") -> void:
 	rpc_id(id, "kicked", reason)
 	await get_tree().create_timer(0.5).timeout
-	if multiplayer.has_multiplayer_peer() and multiplayer.multiplayer_peer is ENetMultiplayerPeer:
-		var peer := multiplayer.multiplayer_peer as ENetMultiplayerPeer
-		if peer.get_peer(id) != null:
-			peer.disconnect_peer(id)
+	if not multiplayer.has_multiplayer_peer() or not (multiplayer.multiplayer_peer is ENetMultiplayerPeer):
+		return
+	var peer := multiplayer.multiplayer_peer as ENetMultiplayerPeer
+	# The client usually closes the connection itself as soon as it receives
+	# "kicked", so the peer may already be gone by the time we get here.
+	# get_peer() pushes an engine error for unknown ids, so check the peer list
+	# from the MultiplayerAPI first.
+	if multiplayer.get_peers().has(id):
+		peer.disconnect_peer(id)
 
 @rpc("authority", "reliable")
 func kicked(reason: String) -> void:
