@@ -64,6 +64,7 @@ var players := {}
 var cells := {}
 var tick := 0
 var snap_acc := 0.0
+var _last_snapshots := {}  # viewer_id -> previous snapshot dict (delta compression)
 var allow_dev := false
 
 var _spawns: Array[Vector3] = []
@@ -285,6 +286,7 @@ func _start_match() -> void:
 	_loot_taken.clear()
 	_dynamic_loot.clear()
 	_next_dynamic_id = 10000
+	_last_snapshots.clear()
 	_storm = _new_storm()
 	_storm_damage_acc = 0.0
 	_spawn_cursor = 0
@@ -373,6 +375,7 @@ func _reset_match() -> void:
 	_loot_taken.clear()
 	_dynamic_loot.clear()
 	_next_dynamic_id = 10000
+	_last_snapshots.clear()
 	_storm = _new_storm()
 	_storm_damage_acc = 0.0
 	_spawn_cursor = 0
@@ -1264,7 +1267,15 @@ func _send_snapshots() -> void:
 		var p: Dictionary = players[id]
 		if p.get("bot", false):
 			continue
-		Net.send_snapshot(id, _snapshot_for(id, p), tick, storm_state)
+		var snap := _snapshot_for(id, p)
+		# Delta: skip if nothing changed since last snapshot.
+		var last: Dictionary = _last_snapshots.get(id, {})
+		# Send every 10 ticks (keyframe) or if data changed.
+		var is_keyframe := (tick % 10 == 0)
+		if not is_keyframe and not last.is_empty() and last.hash() == snap.hash():
+			continue
+		_last_snapshots[id] = snap.duplicate(true)
+		Net.send_snapshot(id, snap, tick, storm_state)
 
 func _snapshot_for(viewer_id: int, viewer: Dictionary) -> Dictionary:
 	var out := {}
