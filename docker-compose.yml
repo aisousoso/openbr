@@ -1,11 +1,22 @@
 services:
+  game-server:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    environment:
+      - BR_SECRET=${BR_SECRET:-dev-secret-change-me}
+    ports:
+      - "7777:7777/udp"
+    command: ["--port=7777", "--dev-auth", "--bots=3", "--min-players=2"]
+    restart: unless-stopped
+
   matchmaker:
     build: ./server/matchmaker
     environment:
-      BR_SECRET: "dev-secret-change-me"
-      GAME_SERVERS: "host.docker.internal:7777"
+      - BR_SECRET=${BR_SECRET:-dev-secret-change-me}
+      - GAME_SERVERS=game-server:7777
     ports:
       - "8080:8080"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    depends_on:
+      - game-server
     restart: unless-stopped

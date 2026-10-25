@@ -96,6 +96,7 @@ var _winner_id := 0
 var _placement := {}
 var _match_number := 0
 var _spawn_cursor := 0
+var _analytics: Node
 
 func _ready() -> void:
 	allow_dev = "--dev-auth" in _all_args()
@@ -123,6 +124,10 @@ func _ready() -> void:
 	add_child(arena)
 	_collect_spawns(arena)
 	_spawn_bots()
+
+	_analytics = get_node_or_null("Analytics")
+	if _analytics == null:
+		_analytics = get_node_or_null("/root/Server/Analytics")
 
 	Net.auth_requested.connect(_on_auth_requested)
 	Net.input_received.connect(_on_input_received)
@@ -308,6 +313,8 @@ func _start_match() -> void:
 	_broadcast_match_state()
 	Net.announce_kill_feed("MATCH %d STARTED" % _match_number)
 	print("match %d LIVE (%d players, %d humans)" % [_match_number, players.size(), _human_count()])
+	if _analytics != null:
+		_analytics.match_started(players.size(), _bot_count, _squad_size)
 
 func _reset_player_for_match(id: int, p: Dictionary) -> void:
 	var spawn := _next_match_spawn()
@@ -435,6 +442,14 @@ func _check_match_end() -> void:
 
 	_phase = PHASE_ENDED
 	_phase_timer = _end_delay
+
+	# Analytics.
+	if _analytics != null:
+		var survivors := 0
+		for id in players:
+			if players[id]["alive"]:
+				survivors += 1
+		_analytics.match_ended(_winner_id, _end_delay, survivors)
 
 	# Award Battle Pass XP.
 	_award_battle_pass_xp()
@@ -656,6 +671,9 @@ func _create_player(id: int, is_bot: bool, weapon_index := DEFAULT_WEAPON, appea
 	}
 	p.merge(Inventory.new_state())
 	players[id] = p
+
+	if _analytics != null:
+		_analytics.player_joined(id, is_bot)
 
 	# Assign team for squad mode.
 	if _squad_size > 1:

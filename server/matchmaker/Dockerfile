@@ -1,13 +1,9 @@
-FROM golang:1.22-alpine AS build
-WORKDIR /src
-COPY go.mod ./
-RUN go mod download
-COPY . .
-RUN CGO_ENABLED=0 go build -trimpath -o /out/matchmaker .
+FROM python:3.11-slim
 
-FROM alpine:3.20
-RUN adduser -D -u 10001 app
-USER app
-COPY --from=build /out/matchmaker /usr/local/bin/matchmaker
+WORKDIR /app
+COPY . /app
+
+RUN pip install --no-cache-dir flask
+
 EXPOSE 8080
-ENTRYPOINT ["matchmaker"]
+CMD ["python", "matchmaker.py"]
