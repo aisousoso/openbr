@@ -14,8 +14,8 @@
 | الملف | الحجم | SHA-256 | ملاحظات |
 |---|---:|---|---|
 | `build/OpenBR.apk` | 31,375,900 | `15E38CD7A6DCEA126BE69C3AAC19F88EE61726E5A2B8FE4E9F9E93B9E5144ECD` | debug، `CN=Android Debug`، minSdk 21 |
-| `build/OpenBR-release.apk` | 29,768,507 | `06E2A61DEF191D329D97023253D41967F24E1265C2F10608EED29EA5587A9B72` | release، `CN=OpenBR`، APK v1/v2/v3، minSdk 21 |
-| `build/OpenBR-release.aab` | 29,689,022 | `F7269D609676B99DB29D3121F64DB21AD679CF5AB312568B9DA657805E762BE7` | release، `CN=OpenBR`، `bundletool validate` exit 0، minSdk 21 |
+| `build/OpenBR-release.apk` | 29,844,039 | `B2BB51AB1DF3233ABF3C0555A1D427B849140B55184A6D392D11717287D885DD` | release، `CN=OpenBR`، APK v1/v2/v3، minSdk 21 |
+| `build/OpenBR-release.aab` | 29,765,369 | `55C4FD1AD1D6ADD00479009016462F41F155AC8BBA2CDECACA8693B3221F95D4` | release، `CN=OpenBR`، `bundletool validate` exit 0، minSdk 21 |
 
 كل المخرجات: `org.openbr.game`، الإصدار `0.2.0`، `targetSdk 34`، ARM64 فقط،
 وصلاحية `INTERNET`. نسخة release غير debuggable.
