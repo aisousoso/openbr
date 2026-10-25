@@ -13,6 +13,7 @@ const ARENA := preload("res://maps/verdant_reach.tscn")
 const Weapons := preload("res://shared/weapons.gd")
 const Characters := preload("res://shared/characters.gd")
 const MapData := preload("res://shared/map_data.gd")
+const Replay := preload("res://client/replay.gd")
 
 const RECONCILE_DISTANCE := 1.0
 const REMOTE_TIMEOUT_MS := 2000
@@ -38,6 +39,7 @@ var _last_phase := ""
 var _spectating := false
 var _spectate_target_id := 0
 var _spectator_camera: Camera3D
+var _replay: Replay
 
 @onready var hud = $HUD
 @onready var touch = $Touch
@@ -76,6 +78,9 @@ func _ready() -> void:
 	match_panel.ready_pressed.connect(_on_ready_pressed)
 	match_panel.leave_pressed.connect(_on_leave_pressed)
 	match_panel.spectate_next_pressed.connect(_on_spectate_next)
+
+	_replay = Replay.new()
+	add_child(_replay)
 
 	_spectator_camera = Camera3D.new()
 	_spectator_camera.name = "SpectatorCamera"
@@ -365,6 +370,12 @@ func _on_match_state(state: Dictionary) -> void:
 	var phase := String(state.get("phase", "WAITING"))
 	var you_alive := bool(state.get("you_alive", false))
 
+	# Replay recording.
+	if phase == "LIVE" and not _replay.recording and not _replay.playing:
+		_replay.start_recording()
+	if phase == "ENDED" and _replay.recording:
+		_replay.stop_recording()
+
 	match_panel.apply_state(state)
 	hud.set_alive(int(state.get("alive", 0)), int(state.get("total", 0)))
 	# Loot is only interactive during a live match; keep the lobby readable.
@@ -531,6 +542,9 @@ func _roster_name(id: int) -> String:
 func _on_snapshot(snap: Dictionary, _tick: int, storm: Dictionary) -> void:
 	var my_id := multiplayer.get_unique_id()
 	var now := Time.get_ticks_msec()
+
+	# Record for replay.
+	_replay.record_frame(snap, _match_state, storm)
 
 	if storm.is_empty():
 		storm_visual.reset()
