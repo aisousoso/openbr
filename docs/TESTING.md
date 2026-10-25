@@ -9,9 +9,9 @@
 
 | البند | الحالة | الدليل |
 |---|---|---|
-| بناء debug APK | ✅ تم | `build/OpenBR.apk` 0.2.0 (versionCode 2)، توقيع `CN=Android Debug`، `apksigner verify` exit 0 |
-| بناء release APK | ✅ تم | `build/OpenBR-release.apk` 0.2.0 (versionCode 2)، توقيع `CN=OpenBR`، `apksigner verify` exit 0 |
-| بناء release AAB | ✅ تم | `build/OpenBR-release.aab` 0.2.0 (versionCode 2)، `bundletool validate` exit 0 |
+| بناء debug APK | ✅ تم | `build/OpenBR.apk` 27,282,162 بايت، توقيع `CN=Godot`، `apksigner verify` exit 0 |
+| بناء release APK | ✅ تم | `build/OpenBR-release.apk` 25,750,301 بايت، توقيع `CN=OpenBR`، `apksigner verify` exit 0 |
+| بناء release AAB | ✅ تم | `build/OpenBR-release.aab` 25,687,671 بايت، `bundletool validate` exit 0 |
 | `org.openbr.game` + `targetSdk 34` + ARM64 + `INTERNET` | ✅ تم | `aapt dump badging` + `bundletool dump manifest` |
 | minSdk للـAPK | ✅ 21 | `aapt dump badging` |
 | minSdk للـAAB | ✅ 21 | `bundletool dump manifest` |
