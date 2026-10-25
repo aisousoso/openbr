@@ -15,10 +15,41 @@ var _root: Node3D
 var _head_group: Node3D
 var _materials := {}
 
+# Animation state.
+var animation_state := "idle"  # idle, walk, run, crouch, reload, dead
+var _anim_time := 0.0
+var _walk_speed := 0.0
+
 func _ready() -> void:
 	if appearance.is_empty():
 		appearance = Characters.default_appearance(0)
 	_rebuild()
+	set_process(true)
+
+func _process(delta: float) -> void:
+	if _root == null or not is_instance_valid(_root):
+		return
+	_anim_time += delta
+	# Simple bob animation for walk/run.
+	if animation_state == "walk" or animation_state == "run":
+		var speed := 8.0 if animation_state == "run" else 5.0
+		var bob := sin(_anim_time * speed) * 0.03
+		_root.position.y = bob
+	elif animation_state == "dead":
+		# Fall over.
+		_root.rotation_degrees.x = lerpf(_root.rotation_degrees.x, 90.0, delta * 5.0)
+		_root.position.y = lerpf(_root.position.y, 0.0, delta * 5.0)
+	elif animation_state == "crouch":
+		_root.scale.y = lerpf(_root.scale.y, 0.7, delta * 8.0)
+	else:
+		_root.position.y = lerpf(_root.position.y, 0.0, delta * 8.0)
+		_root.scale.y = lerpf(_root.scale.y, 1.0, delta * 8.0)
+		_root.rotation_degrees.x = lerpf(_root.rotation_degrees.x, 0.0, delta * 8.0)
+
+func set_animation(state: String) -> void:
+	animation_state = state
+	if state == "dead":
+		_anim_time = 0.0
 
 func apply_appearance(value: Dictionary) -> void:
 	var safe := Characters.sanitize(value)
