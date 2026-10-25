@@ -74,6 +74,7 @@ var _storm_time_scale := 1.0
 var _run_seconds := 0.0
 var _run_elapsed := 0.0
 var _bot_count := 0
+var _squad_size := 1
 var _loot_taken := {}
 var _dynamic_loot := {}  # id -> {type, pos, respawn_at}
 var _next_dynamic_id := 10000
@@ -106,6 +107,7 @@ func _ready() -> void:
 		_storm_time_scale = 1.0
 	_run_seconds = float(_arg("--run-seconds", "0"))
 	_bot_count = clampi(int(_arg("--bots", "0")), 0, BOT_MAX)
+	_squad_size = clampi(int(_arg("--squad-size", "1")), 1, 4)
 	_test_loot = "--test-loot" in _all_args()
 	_min_players = maxi(1, int(_arg("--min-players", "2")))
 	_countdown_seconds = maxf(0.0, float(_arg("--countdown", "8")))
@@ -329,6 +331,23 @@ func _next_match_spawn() -> Vector3:
 	_spawn_cursor += 1
 	return spawn
 
+func _assign_team(id: int) -> int:
+	# Assign players to teams of squad_size.
+	var team_count := ceili(players.size() / float(_squad_size))
+	# Find the team with fewest members.
+	var team_sizes := {}
+	for pid in players:
+		var tid := int(players[pid].get("team_id", 0))
+		team_sizes[tid] = team_sizes.get(tid, 0) + 1
+	var best_team := 1
+	var best_size := 999
+	for t in range(1, team_count + 2):
+		var sz := int(team_sizes.get(t, 0))
+		if sz < _squad_size and sz < best_size:
+			best_size = sz
+			best_team = t
+	return best_team
+
 func _random_loot_pos() -> Vector3:
 	var half := MapData.HALF_SIZE - 5.0
 	var x := randf_range(-half, half)
@@ -365,14 +384,32 @@ func _reset_match() -> void:
 func _check_match_end() -> void:
 	if _phase != PHASE_LIVE:
 		return
-	var alive_ids: Array = []
-	for id in players:
-		if players[id]["alive"]:
-			alive_ids.append(id)
-	if alive_ids.size() > 1:
-		return
 
-	_winner_id = int(alive_ids[0]) if alive_ids.size() == 1 else 0
+	if _squad_size > 1:
+		# Squad mode: last team standing wins.
+		var alive_teams := {}
+		for id in players:
+			if players[id]["alive"]:
+				var tid := int(players[id].get("team_id", 0))
+				alive_teams[tid] = true
+		if alive_teams.size() > 1:
+			return
+		# Find a winner from the surviving team.
+		var winner_team := int(alive_teams.keys()[0]) if alive_teams.size() == 1 else 0
+		_winner_id = 0
+		if winner_team > 0:
+			for id in players:
+				if players[id]["alive"] and int(players[id].get("team_id", 0)) == winner_team:
+					_winner_id = id
+					break
+	else:
+		var alive_ids: Array = []
+		for id in players:
+			if players[id]["alive"]:
+				alive_ids.append(id)
+		if alive_ids.size() > 1:
+			return
+		_winner_id = int(alive_ids[0]) if alive_ids.size() == 1 else 0
 	if _winner_id != 0:
 		_placement[_winner_id] = 1
 		Net.announce_kill_feed("%s WINS THE MATCH" % _display_name(_winner_id))
@@ -429,6 +466,8 @@ func _match_state_for(id: int) -> Dictionary:
 		"winner": _winner_id,
 		"winner_name": _display_name(_winner_id) if _winner_id != 0 else "",
 		"match": _match_number,
+		"team_id": int(p.get("team_id", 0)),
+		"squad_size": _squad_size,
 		"roster": _roster(),
 	}
 
@@ -447,6 +486,7 @@ func _roster() -> Array:
 			"name": _display_name(id),
 			"alive": bool(p["alive"]),
 			"bot": bool(p.get("bot", false)),
+			"team_id": int(p.get("team_id", 0)),
 		})
 	return out
 
@@ -559,10 +599,15 @@ func _create_player(id: int, is_bot: bool, weapon_index := DEFAULT_WEAPON, appea
 		"switch_until": 0.0,
 		"bot": is_bot,
 		"ready": is_bot,
+		"team_id": 0,
 		"appearance": appearance_data,
 	}
 	p.merge(Inventory.new_state())
 	players[id] = p
+
+	# Assign team for squad mode.
+	if _squad_size > 1:
+		p["team_id"] = _assign_team(id)
 
 	if not cells.has(cell):
 		cells[cell] = []
@@ -964,6 +1009,11 @@ func _apply_damage(victim_id: int, killer_id: int, now: float, amount := 25, ign
 	var victim = players.get(victim_id)
 	if victim == null or not victim["alive"]:
 		return
+	# Friendly fire prevention in squad mode.
+	if _squad_size > 1 and killer_id != 0:
+		var killer = players.get(killer_id)
+		if killer != null and int(killer.get("team_id", 0)) == int(victim.get("team_id", 0)):
+			return
 
 	var result := Inventory.apply_damage(victim, amount, ignore_armor)
 	if not bool(result["dead"]):
@@ -1256,6 +1306,7 @@ func _pack(p: Dictionary) -> Array:
 		int(look["character"]), look["primary"], look["secondary"], look["accent"], int(look["outfit"]),
 		int(p.get("armor", 0)), int(inv.get("bandage", 0)), int(inv.get("medkit", 0)),
 		Inventory.heal_remaining(p, now), int(p.get("heal_type", 0)),
+		int(p.get("team_id", 0)),
 	]
 
 # ---------------------------------------------------------------- helpers
