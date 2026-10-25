@@ -493,7 +493,7 @@ adb install -r build/OpenBR-release.apk
 
 | الملف | الحجم | SHA-256 | التوقيع / ملاحظات |
 |---|---:|---|---|
-| `build/OpenBR.apk` | 31,375,900 | `15E38CD7A6DCEA126BE69C3AAC19F88EE61726E5A2B8FE4E9F9E93B9E5144ECD` | debug، `CN=Android Debug`، ARM64، minSdk 21 |
+| `build/OpenBR.apk` | 31,375,900 | `4CC26EE93F7290798D7CE9C1AB446FCA37F720203A3E0006CDCBCBE2CF6BED39` | debug، `CN=Android Debug`، ARM64، minSdk 21 |
 | `build/OpenBR-release.apk` | 29,844,039 | `B2BB51AB1DF3233ABF3C0555A1D427B849140B55184A6D392D11717287D885DD` | release، `CN=OpenBR`، APK v1/v2/v3، minSdk 21 |
 | `build/OpenBR-release.aab` | 29,765,369 | `55C4FD1AD1D6ADD00479009016462F41F155AC8BBA2CDECACA8693B3221F95D4` | release، `CN=OpenBR`، `bundletool validate` exit 0، minSdk 21 |
 
