@@ -696,6 +696,15 @@ func _on_player_left(id: int) -> void:
 
 func _on_shot_fired(shooter: int, from: Vector3, to: Vector3, hit: int, weapon: int) -> void:
 	_spawn_tracer(from, to, weapon)
+	# Muzzle flash at shooter position.
+	var flash := preload("res://client/muzzle_flash.gd").new()
+	flash.position = from
+	$Effects.add_child(flash)
+	# Hit effect at impact point.
+	if hit != 0:
+		var hit_fx := preload("res://client/hit_effect.gd").new()
+		hit_fx.position = to
+		$Effects.add_child(hit_fx)
 	var my_id := multiplayer.get_unique_id()
 	if shooter == my_id and hit != 0:
 		hud.flash_hit()
