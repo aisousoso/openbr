@@ -417,7 +417,7 @@ func _on_kill_feed(text: String) -> void:
 
 func _on_emote_received(player_id: int, emote_index: int) -> void:
 	# Show a floating emote label above the player.
-	var emotes := ["👋", "👍", "😀", "👏", "💃"]
+	var emotes: Array[String] = ["👋", "👍", "😀", "👏", "💃"]
 	var emote_text := emotes[clampi(emote_index, 0, emotes.size() - 1)]
 	var target_node: Node3D = null
 	if player_id == multiplayer.get_unique_id():
