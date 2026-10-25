@@ -156,7 +156,7 @@ func request_emote(emote_index: int) -> void:
 func request_ping(pos: Vector3) -> void:
 	if is_server() or not is_client_connected():
 		return
-	rpc_id(1, "request_ping_rpc", pos)
+	rpc_id(1, "request_ping_rpc", pos.x, pos.y, pos.z)
 
 func send_ready(ready: bool) -> void:
 	if is_server() or not is_client_connected():
@@ -241,9 +241,10 @@ func request_emote_rpc(emote_index: int) -> void:
 	emote_requested.emit(multiplayer.get_remote_sender_id(), emote_index)
 
 @rpc("any_peer", "reliable")
-func request_ping_rpc(pos: Vector3) -> void:
+func request_ping_rpc(px: float, py: float, pz: float) -> void:
 	if not multiplayer.is_server():
 		return
+	var pos := Vector3(px, py, pz)
 	ping_requested.emit(multiplayer.get_remote_sender_id(), pos)
 
 @rpc("any_peer", "reliable")
@@ -335,10 +336,11 @@ func apply_emote(player_id: int, emote_index: int) -> void:
 	emote_received.emit(player_id, emote_index)
 
 func announce_ping(player_id: int, pos: Vector3) -> void:
-	rpc("apply_ping", player_id, pos)
+	rpc("apply_ping", player_id, pos.x, pos.y, pos.z)
 
 @rpc("authority", "reliable")
-func apply_ping(player_id: int, pos: Vector3) -> void:
+func apply_ping(player_id: int, px: float, py: float, pz: float) -> void:
+	var pos := Vector3(px, py, pz)
 	ping_received.emit(player_id, pos)
 
 func announce_loot_spawned(loot_id: int, item_type: String, pos: Vector3) -> void:

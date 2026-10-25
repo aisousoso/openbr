@@ -189,7 +189,7 @@ func _physics_process(delta: float) -> void:
 			var moved := old_pos.distance_to(p["pos"])
 			var max_move := 15.0 * delta  # 15 m/s max
 			if moved > max_move and not p.get("bot", false):
-				var dir := (p["pos"] - old_pos).normalized()
+				var dir: Vector3 = (p["pos"] - old_pos).normalized()
 				p["pos"] = old_pos + dir * max_move
 				body.global_position = p["pos"]
 			_update_cell(id, p)
