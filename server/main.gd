@@ -129,6 +129,7 @@ func _ready() -> void:
 	Net.peer_disconnected.connect(_on_peer_disconnected)
 	Net.ready_requested.connect(_on_ready_requested)
 	Net.emote_requested.connect(_on_emote_requested)
+	Net.ping_requested.connect(_on_ping_requested)
 
 	var port := int(_arg("--port", "7777"))
 	var err := Net.host_game(port, MAX_PLAYERS)
@@ -403,6 +404,14 @@ func _on_emote_requested(id: int, emote_index: int) -> void:
 	if p == null or not p["alive"]:
 		return
 	Net.announce_emote(id, emote_index)
+
+func _on_ping_requested(id: int, pos: Vector3) -> void:
+	if _phase != PHASE_LIVE:
+		return
+	var p = players.get(id)
+	if p == null or not p["alive"]:
+		return
+	Net.announce_ping(id, pos)
 
 func _match_state_for(id: int) -> Dictionary:
 	var p: Dictionary = players.get(id, {})

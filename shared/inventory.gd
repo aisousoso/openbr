@@ -76,6 +76,25 @@ static func pickup(state: Dictionary, item_type: String) -> Dictionary:
 				return {"ok": false, "message": "Ammo full"}
 			return {"ok": true, "message": "Ammo +%d" % total}
 
+		"supply_crate":
+			# Supply crate gives armor + medkit + ammo + bandage.
+			var armor := int(state.get("armor", 0))
+			var max_armor := int(state.get("armor_max", MAX_ARMOR))
+			if armor < max_armor:
+				var armor_add := mini(50, max_armor - armor)
+				state["armor"] = armor + armor_add
+			var inv: Dictionary = state.get("inventory", {})
+			if inv.is_empty():
+				inv = {"bandage": 0, "medkit": 0}
+				state["inventory"] = inv
+			inv["bandage"] = mini(5, int(inv.get("bandage", 0)) + 2)
+			inv["medkit"] = mini(3, int(inv.get("medkit", 0)) + 1)
+			var ammo: Dictionary = state.get("ammo", {})
+			if not ammo.is_empty():
+				for weapon_index in ammo.keys():
+					ammo[weapon_index]["reserve"] = int(ammo[weapon_index]["reserve"]) + 15
+			return {"ok": true, "message": "Supply crate opened!"}
+
 	return {"ok": false, "message": "Unknown item"}
 
 ## Starts a timed heal. Consumables are spent immediately; damage or firing

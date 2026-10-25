@@ -33,6 +33,11 @@ const ITEM_DEFS := {
 		"amount": 30,
 		"color": Color(0.78, 0.86, 0.28),
 	},
+	"supply_crate": {
+		"label": "SUPPLY CRATE",
+		"amount": 1,
+		"color": Color(0.95, 0.75, 0.2, 1.0),
+	},
 }
 
 ## Fixed positions keep the server and client in sync without shipping a loot
@@ -164,6 +169,10 @@ const SPAWNS := [
 	{"id": 98, "type": "medkit", "pos": Vector3(50.0, 0.25, 30.0)},
 	{"id": 99, "type": "armor", "pos": Vector3(-69.0, 0.25, 50.0)},
 
+	# Supply crates (airdrops).
+	{"id": 100, "type": "supply_crate", "pos": Vector3(0.0, 0.25, 0.0)},
+	{"id": 101, "type": "supply_crate", "pos": Vector3(40.0, 0.25, -40.0)},
+	{"id": 102, "type": "supply_crate", "pos": Vector3(-40.0, 0.25, 40.0)},
 ]
 
 static func all() -> Array:

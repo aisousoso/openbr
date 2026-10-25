@@ -64,6 +64,7 @@ func _ready() -> void:
 	Net.match_state_received.connect(_on_match_state)
 	Net.kill_feed_received.connect(_on_kill_feed)
 	Net.emote_received.connect(_on_emote_received)
+	Net.ping_received.connect(_on_ping_received)
 
 	connect_screen.connect_requested.connect(_on_connect_requested)
 	connect_screen.back_requested.connect(_on_connect_back)
@@ -131,6 +132,24 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_5: emote_index = 4
 		if emote_index >= 0 and local_player != null and is_instance_valid(local_player):
 			Net.request_emote(emote_index)
+			return
+
+	# Ping (key P or middle mouse).
+	if (event is InputEventKey and event.pressed and event.keycode == KEY_P) or \
+	   (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_MIDDLE):
+		if local_player != null and is_instance_valid(local_player):
+			var cam: Camera3D = local_player.get_node_or_null("Head/Camera3D")
+			if cam != null:
+				var from := cam.global_position
+				var to := from + (-cam.global_transform.basis.z) * 50.0
+				var space := get_world_3d().direct_space_state
+				var hit_pos := to
+				if space != null:
+					var query := PhysicsRayQueryParameters3D.create(from, to, 1)
+					var result := space.intersect_ray(query)
+					if not result.is_empty():
+						hit_pos = result["position"]
+				Net.request_ping(hit_pos)
 			return
 
 	if event.is_action_pressed("ui_cancel"):
@@ -408,6 +427,27 @@ func _on_emote_received(player_id: int, emote_index: int) -> void:
 	timer.timeout.connect(func() -> void:
 		if is_instance_valid(label):
 			label.queue_free()
+	)
+
+func _on_ping_received(player_id: int, pos: Vector3) -> void:
+	# Show a marker at the ping location.
+	var marker := MeshInstance3D.new()
+	var sphere := SphereMesh.new()
+	sphere.radius = 0.3
+	sphere.height = 0.6
+	marker.mesh = sphere
+	marker.position = pos + Vector3(0, 0.5, 0)
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(1.0, 0.9, 0.2, 0.8)
+	mat.emission_enabled = true
+	mat.emission = Color(1.0, 0.9, 0.2)
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	marker.material_override = mat
+	get_tree().current_scene.add_child(marker)
+	var timer := get_tree().create_timer(5.0)
+	timer.timeout.connect(func() -> void:
+		if is_instance_valid(marker):
+			marker.queue_free()
 	)
 
 func _on_ready_pressed(ready: bool) -> void:

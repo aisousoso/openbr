@@ -76,6 +76,10 @@ func _build_visual(root: Node3D, item_type: String) -> void:
 			roll.bottom_radius = 0.18
 			roll.height = 0.25
 			mesh = roll
+		"supply_crate":
+			var crate := BoxMesh.new()
+			crate.size = Vector3(0.8, 0.6, 0.8)
+			mesh = crate
 		_:
 			var box := BoxMesh.new()
 			box.size = Vector3(0.5, 0.3, 0.35)
