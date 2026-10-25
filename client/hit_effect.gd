@@ -19,9 +19,9 @@ func _ready() -> void:
 		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		mesh.material_override = mat
 		var dir := Vector3(randf_range(-1, 1), randf_range(0, 1), randf_range(-1, 1)).normalized()
-		mesh.position = dir * 0.1
-		mesh.look_at(mesh.position + dir, Vector3.UP)
 		add_child(mesh)
+		mesh.global_position = dir * 0.1
+		mesh.look_at(mesh.global_position + dir, Vector3.UP)
 		# Animate outward.
 		var tween := create_tween()
 		tween.tween_property(mesh, "position", dir * 0.6, 0.3)
